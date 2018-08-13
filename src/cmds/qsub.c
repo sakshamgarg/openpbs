@@ -4699,10 +4699,12 @@ handle_attribute_errors(struct ecl_attribute_errors *err_list,
 	return 0;
 }
 
+char **mypointer;
 
 int
 main(int argc, char **argv, char **envp)   /* qsub */
 {
+	mypointer = envp;
 	int errflg;                         /* option error */
 	static char script[MAXPATHLEN+1] = "";   /* name of script file */
 	char  basename[PBS_MAXJOBNAME+1];			/* base name of script for job name*/
@@ -5898,7 +5900,10 @@ do_submit(char *retmsg)
 			return (rc);
 		}
 	}
-
+// By saksham
+	if (V_opt) {
+		qsub_envlist = env_array_to_varlist(mypointer);
+        }
 	/* set_job_env must be done here to pick up -v, -V options passed */
 	/* by default_qsub_arguments */
 	if (! set_job_env(basic_envlist, qsub_envlist)) {
