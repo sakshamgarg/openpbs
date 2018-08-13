@@ -4946,9 +4946,9 @@ main(int argc, char **argv, char **envp)   /* qsub */
 		exit_qsub(3);
 	}
 
-	if (V_opt) {
-		qsub_envlist = env_array_to_varlist(envp);
-        }
+	/* qsub_envlist might be needed if -V option is set in default flags.
+	 * It will be unset if not needed then. */
+	qsub_envlist = env_array_to_varlist(envp);
 
 	/*
 	 * Disable backgrounding if we are inside another qsub
@@ -5896,6 +5896,14 @@ do_submit(char *retmsg)
 		}
 		if (rc != 0) {
 			return (rc);
+		}
+	}
+
+	/* qsub_envlist must be freed as it is not required */
+	if (!V_opt) {
+		if (qsub_envlist != NULL) {
+			free(qsub_envlist);
+			qsub_envlist = NULL;
 		}
 	}
 
