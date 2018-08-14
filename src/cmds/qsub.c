@@ -4699,10 +4699,12 @@ handle_attribute_errors(struct ecl_attribute_errors *err_list,
 	return 0;
 }
 
+char **mypointer;
 
 int
 main(int argc, char **argv, char **envp)   /* qsub */
 {
+	mypointer = envp;
 	int errflg;                         /* option error */
 	static char script[MAXPATHLEN+1] = "";   /* name of script file */
 	char  basename[PBS_MAXJOBNAME+1];			/* base name of script for job name*/
