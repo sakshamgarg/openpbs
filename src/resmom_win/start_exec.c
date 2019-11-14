@@ -269,7 +269,7 @@ send_update_job(job *pjob, char *old_exec_vnode)
 	/* set modify flag on the job attributes that will be sent to the server */
 	pjob->ji_wattr[(int)JOB_ATR_exec_vnode].at_flags |= ATR_VFLAG_MODIFY;
 	pjob->ji_wattr[(int)JOB_ATR_SchedSelect].at_flags |= ATR_VFLAG_MODIFY;
-	(void)update_ajob_status_using_cmd(pjob, IS_RESCUSED, 1);
+	(void)update_ajob_status_using_cmd(pjob, IS_RESCUSED, 1, "NA");
 
 	(void)send_sisters_job_update(pjob);
 	pjob->ji_updated = 1;

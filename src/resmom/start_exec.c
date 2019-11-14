@@ -1778,7 +1778,7 @@ record_finish_exec(int sd)
 				/* job changes, vnode changes, job actions */
 
 				update_ajob_status_using_cmd(pjob,
-					IS_RESCUSED_FROM_HOOK, 0);
+					IS_RESCUSED_FROM_HOOK, 0, "record_finish_exec");
 
 				/* Push vnl hook changes to server */
 				hook_requests_to_server(&vnl_changes);
@@ -2584,7 +2584,7 @@ get_new_exec_vnode_host_schedselect(job *pjob, char *msg, size_t msg_size)
 	/* set modify flag on the job attributes that will be sent to the server */
 	pjob->ji_wattr[(int)JOB_ATR_exec_vnode].at_flags |= ATR_VFLAG_MODIFY;
 	pjob->ji_wattr[(int)JOB_ATR_SchedSelect].at_flags |= ATR_VFLAG_MODIFY;
-	(void)update_ajob_status_using_cmd(pjob, IS_RESCUSED, 1);
+	(void)update_ajob_status_using_cmd(pjob, IS_RESCUSED, 1, "NA");
 
 	return (0);
 }

@@ -58,6 +58,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <execinfo.h>
 #include "dis.h"
 #include "libpbs.h"
 #include "list_link.h"
@@ -600,7 +601,7 @@ json_dumps_fail:
  *
  */
 static void
-encode_used(job *pjob, pbs_list_head *phead)
+encode_used(job *pjob, pbs_list_head *phead, char const *caller_name)
 {
 	unsigned long	 lnum;
 	unsigned long	 lnum3;
@@ -737,8 +738,9 @@ encode_used(job *pjob, pbs_list_head *phead)
 					char mom_hname[PBS_MAXHOSTNAME+1];
 					char *p = NULL;
 
-					if (pjob->ji_resources[i].nodehost == NULL)
+					if (pjob->ji_resources[i].nodehost == NULL) {
 						continue;
+					}
 
 					strncpy(mom_hname,
 						pjob->ji_resources[i].nodehost,
@@ -749,7 +751,11 @@ encode_used(job *pjob, pbs_list_head *phead)
 						*p = '\0';
 
 					at2 = &pjob->ji_resources[i].nr_used;
+					snprintf(log_buffer, sizeof(log_buffer), "WORLD: Resource Number=%d; FLAG=%d; Caller_name=%s", i,at2->at_flags, caller_name);
+					log_err(-1, __func__, log_buffer);
+
 					if ((at2->at_flags & ATR_VFLAG_SET) == 0) {
+						log_err(-1, __func__, "WORLD: Continue 2");
 						continue;
 					}
 
@@ -791,11 +797,15 @@ encode_used(job *pjob, pbs_list_head *phead)
 							}
 
 						} else  {
+							//snprintf(log_buffer, sizeof(log_buffer), "WORLD: MOM=%s ; Previous_float=%f ; Previous_Int=%d ; Next_float=%f ; Next_Int=%d; Caller_name=%s", mom_hname, tmpatr.at_val.at_float, tmpatr.at_val.at_short, val2.at_val.at_float, val2.at_val.at_short, caller_name);
+							//log_err(-1, __func__, log_buffer);
 							rd->rs_set(&tmpatr, &val2, INCR);
 							if (pjob->ji_resources[i].nr_status != PBS_NODERES_DELETE) {
 								rd->rs_set(&tmpatr3, &val2, INCR);
 							}
 						}
+						//snprintf(log_buffer, sizeof(log_buffer), "WORLD: MOM=%s ; NEW_float=%f ; NEW_Int=%d ; OLD_float=%f ; OLD_Int=%d; Caller_name=%s", mom_hname, tmpatr.at_val.at_float, tmpatr.at_val.at_short, val2.at_val.at_float, val2.at_val.at_short, caller_name);
+						//log_err(-1, __func__, log_buffer);
 						break;
 					}
 				}
@@ -1041,7 +1051,7 @@ encode_used_exit:
  */
 
 void
-update_ajob_status_using_cmd(job *pjob, int cmd, int use_rtn_list_ext)
+update_ajob_status_using_cmd(job *pjob, int cmd, int use_rtn_list_ext, char *caller_name)
 {
 	attribute		 *at;
 	attribute_def		 *ad;
@@ -1092,6 +1102,9 @@ update_ajob_status_using_cmd(job *pjob, int cmd, int use_rtn_list_ext)
 		}
 	}
 
+	snprintf(log_buffer, sizeof(log_buffer), "Caller_name: %s", caller_name);
+	log_err(0, __func__, log_buffer);
+
 
 	/* if cmd is IS_RESCUSED_FROM_HOOK, send resources_used info
 	 * to the server if coming from mother superior of job.
@@ -1099,8 +1112,10 @@ update_ajob_status_using_cmd(job *pjob, int cmd, int use_rtn_list_ext)
 	if ((cmd != IS_RESCUSED_FROM_HOOK) ||
 		((pjob->ji_qs.ji_svrflags & JOB_SVFLG_HERE) != 0)) {
 		/* now append resources used */
+		snprintf(log_buffer, sizeof(log_buffer), "FLAGS_pjob_0=%d; FLAGS_pjob_1=%d", pjob->ji_resources[0].nr_used.at_flags, pjob->ji_resources[1].nr_used.at_flags);
+		log_err(0, __func__, log_buffer);
 
-		encode_used(pjob, &rused.ru_attr);
+		encode_used(pjob, &rused.ru_attr, __func__);
 	}
 
 	/* now send info to server via rpp */
@@ -1127,7 +1142,7 @@ update_ajob_status_using_cmd(job *pjob, int cmd, int use_rtn_list_ext)
 void
 update_ajob_status(job *pjob)
 {
-	update_ajob_status_using_cmd(pjob, IS_RESCUSED, 0);
+	update_ajob_status_using_cmd(pjob, IS_RESCUSED, 0, "update_ajob_status");
 }
 
 /**
@@ -1189,7 +1204,7 @@ update_jobs_status(void)
 			&prused->ru_attr,
 			job_attr_def[(int)JOB_ATR_session_id].at_name,
 			NULL, ATR_ENCODE_CLIENT, NULL);
-		encode_used(pjob, &prused->ru_attr);
+		encode_used(pjob, &prused->ru_attr, __func__);
 
 		if (svr_hook_resend_job_attrs != 0) {
 			int		 index;
@@ -1313,9 +1328,8 @@ send_obit(job *pjob, int exval)
 				/* Whether or not we accept or reject, we'll make */
 				/* job changes, vnode changes, job actions */
 
-
 				update_ajob_status_using_cmd(pjob,
-					IS_RESCUSED_FROM_HOOK, 0);
+					IS_RESCUSED_FROM_HOOK, 0, "send_obit");
 
 				/* Push vnl  hook changes to server */
 				hook_requests_to_server(&vnl_changes);
@@ -1361,7 +1375,9 @@ send_obit(job *pjob, int exval)
 			rud.ru_hop = pjob->ji_wattr[(int)JOB_ATR_runcount].at_val.at_long;
 		}
 		CLEAR_HEAD(rud.ru_attr);
-		encode_used(pjob, &rud.ru_attr);
+		//snprintf(log_buffer, sizeof(log_buffer), "FLAGS_pjob_0=%d; FLAGS_pjob_1=%d", pjob->ji_resources[0].nr_used.at_flags, pjob->ji_resources[1].nr_used.at_flags);
+		//log_err(0, __func__, log_buffer);
+		encode_used(pjob, &rud.ru_attr, __func__);
 #ifdef	WIN32
 		if( pjob->ji_wattr[(int)JOB_ATR_Comment].at_flags & \
 							ATR_VFLAG_SET) {

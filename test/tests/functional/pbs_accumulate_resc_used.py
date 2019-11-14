@@ -783,12 +783,20 @@ import pbs
 e = pbs.event()
 j = e.job
 pbs.logmsg(pbs.LOG_DEBUG, "executed epilogue hook")
-j.resources_used["foo_i"] = 2
-j.resources_used["foo_i2"] = pbs.size(1000)
-j.resources_used["foo_f"] = 1.02
-j.resources_used["foo_f2"] = 2.01
-j.resources_used["stra"] = '"happy"'
-j.resources_used["stra2"] = '"glad"'
+if j.in_ms_mom():
+    j.resources_used["foo_i"] = 2
+    j.resources_used["foo_i2"] = pbs.size(1000)
+    j.resources_used["foo_f"] = 1.02
+    j.resources_used["foo_f2"] = 2.01
+    j.resources_used["stra"] = '"happy"'
+    j.resources_used["stra2"] = '"glad"'
+else :
+    j.resources_used["foo_i"] = 3
+    j.resources_used["foo_i2"] = pbs.size(2000)
+    j.resources_used["foo_f"] = 1.03
+    j.resources_used["foo_f2"] = 2.02
+    j.resources_used["stra"] = '"happy"'
+    j.resources_used["stra2"] = '"glad"'
 """
 
         # Create and import hook
@@ -816,10 +824,10 @@ j.resources_used["stra2"] = '"glad"'
         jid = self.server.submit(j)
 
         # Verify the resource values
-        a = {'resources_used.foo_i': '6',
-             'resources_used.foo_i2': '3kb',
-             'resources_used.foo_f': '3.06',
-             'resources_used.foo_f2': '6.03',
+        a = {'resources_used.foo_i': '8',
+             'resources_used.foo_i2': '5kb',
+             'resources_used.foo_f': '3.08',
+             'resources_used.foo_f2': '6.05',
              'resources_used.stra': "\"happy\"",
              'resources_used.stra2': "\"glad\"",
              'job_state': 'F'}

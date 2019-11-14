@@ -2804,6 +2804,10 @@ send_resc_used_to_ms(int stream, char *jobid)
 
 	while (pal != NULL) {
 		nxpal = (struct svrattrl *)GET_NEXT(pal->al_link);
+		//snprintf(log_buffer, sizeof(log_buffer), "WORLD: MoM=%s", pjob, pjob->ji_qs.ji_un.ji_exect.ji_momaddr);
+		//log_err(0, __func__, log_buffer);
+		snprintf(log_buffer, sizeof(log_buffer), "WORLD: Job: %s; name: %s; value: %s; flags=%d", jobid, pal->al_atopl.resource, pal->al_atopl.value, pal->al_flags);
+		log_err(0,__func__, log_buffer);
 
 		/* no need to track the resources automatically sent to MS */
 		/* like 'cput', 'mem', and 'cpupercent',but only those */
@@ -2812,6 +2816,8 @@ send_resc_used_to_ms(int stream, char *jobid)
 		     (strcmp(pal->al_resc, "cput") != 0) && \
 		     (strcmp(pal->al_resc, "mem") != 0) && \
 		     (strcmp(pal->al_resc, "cpupercent") != 0)) {
+			snprintf(log_buffer, sizeof(log_buffer), "WORLD,Inside: Job: %s; name: %s; value: %s; flags=%d", jobid, pal->al_resc, pal->al_value, pal->al_flags);
+			log_err(0,__func__, log_buffer);
 			if (add_to_svrattrl_list(
 				&send_head,
 				pal->al_name,
@@ -2820,6 +2826,7 @@ send_resc_used_to_ms(int stream, char *jobid)
 				pal->al_op, NULL) == -1) {
 				free_attrlist(&send_head);
 				free_attrlist(&lhead);
+				log_err(-1,__func__,"WORLD: Could not add to svr attr list");
 				return (-1);
 			}
 
@@ -2860,7 +2867,7 @@ send_resc_used_to_ms(int stream, char *jobid)
  *
  */
 int
-recv_resc_used_from_sister(int stream, char *jobid, int nodeidx)
+recv_resc_used_from_sister(int stream, char *jobid, int nodeidx, char *caller_name)
 {
 	attribute_def		*pdef;
 	pbs_list_head		lhead;
@@ -2884,12 +2891,16 @@ recv_resc_used_from_sister(int stream, char *jobid, int nodeidx)
 
 
 	pdef = &job_attr_def[(int)JOB_ATR_resc_used];
+	snprintf(log_buffer, sizeof(log_buffer), "Caller_name: %s", caller_name);
+	log_err(0, __func__, log_buffer);
 
 	CLEAR_HEAD(lhead);
 	if (decode_DIS_svrattrl(stream, &lhead) != DIS_SUCCESS) {
 		sprintf(log_buffer, "decode_DIS_svrattrl failed");
 		return (-1);
 	}
+	snprintf(log_buffer, sizeof(log_buffer), "WORLD: FLAGS_pjob=%d", pjob->ji_resources[nodeidx].nr_used.at_flags);
+	log_err(0, __func__, log_buffer);
 	if  ((pjob->ji_resources[nodeidx].nr_used.at_flags & ATR_VFLAG_SET) != 0) {
 		pdef->at_free(&pjob->ji_resources[nodeidx].nr_used);
 	}
@@ -2906,6 +2917,10 @@ recv_resc_used_from_sister(int stream, char *jobid, int nodeidx)
 			free_attrlist(&lhead);
 			return (-1);
 		}
+		snprintf(log_buffer, sizeof(log_buffer), "WORLD: MoM=%s; FLAGS_pjob=%d", pjob->ji_resources[nodeidx].nodehost, pjob->ji_resources[nodeidx].nr_used.at_flags);
+		log_err(0, __func__, log_buffer);
+		snprintf(log_buffer, sizeof(log_buffer), "WORLD: Job: %s; name: %s; value: %s; FLAGS_svrattrl=%d", jobid, psatl->al_atopl.resource, psatl->al_atopl.value, psatl->al_flags);
+		log_err(0, __func__, log_buffer);
 
 		if (strcmp(psatl->al_name, ATTR_used) != 0) {
 			free_attrlist(&lhead);
@@ -2919,6 +2934,8 @@ recv_resc_used_from_sister(int stream, char *jobid, int nodeidx)
 			psatl->al_value);
 		/* Unknown resources still get decoded */
 		/* under "unknown" resource def */
+		snprintf(log_buffer, sizeof(log_buffer), "WORLD: ErrorCode=%d; FLAGS_pjob=%d", errcode, pjob->ji_resources[nodeidx].nr_used.at_flags);
+		log_err(0, __func__, log_buffer);
 		if ((errcode != 0) && (errcode != PBSE_UNKRESC)) {
 			free_attrlist(&lhead);
 			return (-1);
@@ -4705,7 +4722,7 @@ join_err:
 						__func__, jobid, nodeidx,
 						pjob->ji_resources[nodeidx-1].nr_cput,
 						pjob->ji_resources[nodeidx-1].nr_mem))
-					recv_resc_used_from_sister(stream, jobid, nodeidx-1);
+					recv_resc_used_from_sister(stream, jobid, nodeidx-1, "IM_KILL_JOB");
 
 					/* don't close stream in case other jobs use it */
 					np->hn_sister = SISTER_KILLDONE;
@@ -4913,7 +4930,7 @@ join_err:
 					pjob->ji_resources[nodeidx-1].nr_cpupercent =
 						disrul(stream, &ret);
 					BAIL("OK-POLL_JOB cpupercent")
-					recv_resc_used_from_sister(stream, jobid, nodeidx-1);
+					recv_resc_used_from_sister(stream, jobid, nodeidx-1, "IM_POLL_JOB");
 					DBPRT(("%s: POLL_JOB %s OKAY kill %d cpu %lu mem %lu\n",
 						__func__, jobid, exitval,
 						pjob->ji_resources[nodeidx-1].nr_cput,

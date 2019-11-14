@@ -3314,7 +3314,7 @@ post_run_hook(struct work_task *ptask)
 				/* Whether or not we accept or reject, we'll make */
 				/* job changes, vnode changes, job actions */
 				update_ajob_status_using_cmd(pjob,
-					IS_RESCUSED_FROM_HOOK, 0);
+					IS_RESCUSED_FROM_HOOK, 0, "post_run_hook");
 			}
 
 
