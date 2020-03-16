@@ -39,7 +39,6 @@ import sys
 import socket
 import logging
 import signal
-import pwd
 import re
 from nose.util import isclass
 from nose.plugins.base import Plugin
@@ -182,7 +181,7 @@ class PTLTestData(Plugin):
         pbs_snapshot_path = os.path.join(
             server.pbs_conf["PBS_EXEC"], "sbin", "pbs_snapshot")
         cur_user = self.du.get_current_user()
-        cur_user_dir = pwd.getpwnam(cur_user).pw_dir
+        cur_user_dir = DshUtils().getpwnam(cur_user).pw_dir
         cmd = [
             pbs_snapshot_path,
             '-H', server_host,

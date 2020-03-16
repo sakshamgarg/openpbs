@@ -1,6 +1,6 @@
 # coding: utf-8
 
-# Copyright (C) 1994-2020 Altair Engineering, Inc.
+# Copyright (C) 1994-2019 Altair Engineering, Inc.
 # For more information, contact Altair at www.altair.com.
 #
 # This file is part of the PBS Professional ("PBS Pro") software.
@@ -66,7 +66,7 @@ class PTLJsonData(object):
                 'command': self.__cmd,
                 'user': self.__du.get_current_user(),
                 'product_version': data['pbs_version'],
-                'run_id': data['start_time'].strftime('%s'),
+                'run_id': data['start_time'].timestamp(),#.strftime('%s'),
                 'test_conf': {},
                 'machine_info': data['machinfo'],
                 'testsuites': {},

@@ -1,6 +1,6 @@
 # coding: utf-8
 
-# Copyright (C) 1994-2020 Altair Engineering, Inc.
+# Copyright (C) 1994-2019 Altair Engineering, Inc.
 # For more information, contact Altair at www.altair.com.
 #
 # This file is part of the PBS Professional ("PBS Pro") software.
@@ -1324,7 +1324,8 @@ quit()
         """
         Capture server logs
         """
-        pbs_logdir = os.path.join(self.pbs_home, "server_logs")
+        #pbs_logdir = os.path.join(self.pbs_home, "server_logs")
+        pbs_logdir = self.pbs_home + "/" + "server_logs"
         snap_logdir = os.path.join(self.snapdir, SVR_LOGS_PATH)
         self.__capture_logs(pbs_logdir, snap_logdir, self.num_daemon_logs)
 

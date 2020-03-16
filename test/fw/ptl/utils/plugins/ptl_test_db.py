@@ -41,7 +41,6 @@ import copy
 import logging
 import os
 import platform
-import pwd
 import sys
 import time
 import traceback
@@ -198,7 +197,7 @@ class PostgreSQLDb(DBType):
         except Exception as e:
             _msg = 'Failed to connect to database:\n%s\n' % (str(e))
             raise PTLDbError(rc=1, rv=False, msg=_msg)
-        self.__username = pwd.getpwuid(os.getuid())[0]
+        self.__username = DshUtils().getpwuid(os.getuid())[0]
         self.__platform = ' '.join(platform.uname()).strip()
         self.__ptlversion = str(ptl.__version__)
         self.__db_version = '1.0.0'
@@ -1609,7 +1608,7 @@ class JSONDb(DBType):
             raise PTLDbError(rc=1, rv=False, msg=_msg)
         elif not self.dbpath.endswith('.json'):
             self.dbpath = self.dbpath.rstrip('.db') + '.json'
-        self.jdata = {
+        '''self.jdata = {
             'test_conf': {},
             'test_summary': {
                 'result_summary': {
@@ -1627,7 +1626,8 @@ class JSONDb(DBType):
             'testsuites': {},
             'tests_with_failures': [],
             'test_suites_with_failures': [],
-            }
+            }'''
+        self.jdata = None
         self.__cmd = [os.path.basename(sys.argv[0])]
         self.__cmd += sys.argv[1:]
         self.__cmd = ' '.join(self.__cmd)

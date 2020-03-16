@@ -40,7 +40,6 @@ import logging
 import fnmatch
 import os
 import platform
-import pwd
 import re
 import signal
 import socket
@@ -67,6 +66,13 @@ from ptl.utils.pbs_testsuite import (MINIMUM_TESTCASE_TIMEOUT,
                                      REQUIREMENTS_KEY, TIMEOUT_KEY)
 from ptl.utils.plugins.ptl_test_info import get_effective_reqs
 from ptl.utils.pbs_testusers import PBS_ALL_USERS
+from ptl.lib.pbs_testlib import *
+from ptl.lib.pbs_testlib import *
+from ptl.utils.pbs_covutils import *
+from ptl.utils.pbs_dshutils import *
+from ptl.utils.pbs_testsuite import *
+from ptl.utils.plugins.ptl_test_info import *
+from ptl.utils.pbs_testusers import *
 from io import StringIO
 
 log = logging.getLogger('nose.plugins.PTLTestRunner')
@@ -824,12 +830,16 @@ class PTLTestRunner(Plugin):
         self.hardware_report_timer = Timer(
             300, self.check_hardware_status_and_core_files)
         self.hardware_report_timer.start()
+        print("PARAM DICT ---------------------------- %s" %self.param_dict)
         systems = list(self.param_dict['servers'])
+        print("SERVERS --------------------------- %s" %list(self.param_dict['servers']))
         systems.extend(self.param_dict['moms'])
+        print("MOMS --------------------------- %s" %self.param_dict['moms'])
         systems.extend(self.param_dict['comms'])
         systems = list(set(systems))
+        print("systems ----------------------- %s" %systems)
         for hostname in systems:
-            hr = SystemInfo()
+            '''hr = SystemInfo()
             hr.get_system_info(hostname)
             # monitors disk
             used_disk_percent = getattr(hr,
@@ -848,7 +858,9 @@ class PTLTestRunner(Plugin):
                 _msg = hostname + ":disk usage > 95%, skipping the test(s)"
                 self.hardware_report_timer.cancel()
                 raise SkipTest(_msg)
+                raise PbsHardwareMonitorError(msg=_msg)'''
             # checks for core files
+            print("HOSTNAME BEFORE check core mom --------------------------------- %s" %hostname)
             pbs_conf = du.parse_pbs_config(hostname)
             mom_priv_path = os.path.join(pbs_conf["PBS_HOME"], "mom_priv")
             if du.isdir(hostname=hostname, path=mom_priv_path):
@@ -924,14 +936,14 @@ class PTLTestRunner(Plugin):
             self.result.startTest(test)
             raise SkipTest(rv)
         # function report hardware status and core files
-        self.check_hardware_status_and_core_files()
+        #self.check_hardware_status_and_core_files()
 
         def timeout_handler(signum, frame):
             raise TimeOut('Timed out after %s second' % timeout)
         timeout = self.__get_timeout(test)
-        old_handler = signal.signal(signal.SIGALRM, timeout_handler)
-        setattr(test, 'old_sigalrm_handler', old_handler)
-        signal.alarm(timeout)
+        #old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+        #setattr(test, 'old_sigalrm_handler', old_handler)
+        #signal.alarm(timeout)
 
     def stopTest(self, test):
         """
@@ -982,16 +994,17 @@ class PTLTestRunner(Plugin):
             ftd = []
             files = du.listdir(path=tmpdir)
             bn = os.path.basename
-            ftd.extend([f for f in files if bn(f).startswith('PtlPbs')])
-            ftd.extend([f for f in files if bn(f).startswith('STDIN')])
-            ftd.extend([f for f in files if bn(f).startswith('pbsscrpt')])
-            ftd.extend([f for f in files if bn(f).startswith('pbs.conf.')])
-            ftd.extend([f for f in files if p.match(bn(f))])
+            if files:
+                ftd.extend([f for f in files if bn(f).startswith('PtlPbs')])
+                ftd.extend([f for f in files if bn(f).startswith('STDIN')])
+                ftd.extend([f for f in files if bn(f).startswith('pbsscrpt')])
+                ftd.extend([f for f in files if bn(f).startswith('pbs.conf.')])
+                ftd.extend([f for f in files if p.match(bn(f))])
             for f in ftd:
-                du.rm(path=f, sudo=True, recursive=True, force=True,
+                du.rm(path=f, platform="win32", sudo=True, recursive=False, force=True,
                       level=logging.DEBUG)
         for f in du.tmpfilelist:
-            du.rm(path=f, sudo=True, force=True, level=logging.DEBUG)
+            du.rm(path=f, platform="win32",sudo=True, force=True, level=logging.DEBUG)
         del du.tmpfilelist[:]
         tmpdir = tempfile.gettempdir()
         os.chdir(tmpdir)
@@ -1009,7 +1022,7 @@ class PTLTestRunner(Plugin):
         _m = 'platform: ' + ' '.join(platform.uname()).strip()
         self.logger.info(_m)
         self.logger.info('python version: ' + str(platform.python_version()))
-        self.logger.info('user: ' + pwd.getpwuid(os.getuid())[0])
+        self.logger.info('user: ' + DshUtils().get_current_user())
         self.logger.info('-' * 80)
 
         if self.lcov_data is not None:
@@ -1046,4 +1059,4 @@ class PTLTestRunner(Plugin):
             self.lcov_utils.generate_html()
             self.lcov_utils.change_baseurl()
             self.logger.info('\n'.join(self.lcov_utils.summarize_coverage()))
-        self._cleanup()
+        #self._cleanup()

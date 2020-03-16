@@ -36,11 +36,11 @@
 # trademark licensing policies.
 
 import calendar
-import grp
+#import grp
 import logging
 import os
 import platform
-import pwd
+#import pwd
 import socket
 import subprocess
 import sys
@@ -51,7 +51,7 @@ from distutils.util import strtobool
 import ptl
 from ptl.lib.pbs_testlib import *
 from ptl.utils.pbs_cliutils import CliUtils
-from ptl.utils.pbs_dshutils import DshUtils
+from ptl.utils.pbs_dshutils import *
 from ptl.utils.pbs_logutils import PBSLogAnalyzer
 from ptl.utils.pbs_procutils import ProcMonitor
 from ptl.utils.pbs_testusers import *
@@ -506,7 +506,7 @@ class PBSTestSuite(unittest.TestCase):
         # comm
         if not self.use_cur_setup:
             self.revert_servers()
-            self.revert_pbsconf()
+            #self.revert_pbsconf()
             self.revert_schedulers()
             self.revert_moms()
         self.revert_comms()
@@ -561,11 +561,11 @@ class PBSTestSuite(unittest.TestCase):
         Check whether the user is exist or not
         """
         testusersexist = True
-        for u in PBS_ALL_USERS:
-            rv = cls.du.check_user_exists(u.name, u.host, u.port)
-            if not rv:
-                _msg = 'User ' + str(u) + ' does not exist!'
-                raise setUpClassError(_msg)
+        #for u in PBS_ALL_USERS:
+        #    rv = cls.du.check_user_exists(u.name, u.host, u.port)
+        #    if not rv:
+        #        _msg = 'User ' + str(u) + ' does not exist!'
+        #        raise setUpClassError(_msg)
         return testusersexist
 
     @classmethod
@@ -606,6 +606,7 @@ class PBSTestSuite(unittest.TestCase):
         if (('clienthost' in cls.conf) and
                 not isinstance(cls.conf['clienthost'], list)):
             cls.conf['clienthost'] = cls.conf['clienthost'].split(':')
+        du = DshUtils()
         users_map = [('test-users', PBS_USERS),
                      ('oper-users', PBS_OPER_USERS),
                      ('mgr-users', PBS_MGR_USERS),
@@ -749,13 +750,16 @@ class PBSTestSuite(unittest.TestCase):
         """
         if init_comm_func is None:
             init_comm_func = cls.init_comm
+        print("INSIDE INIT COMM  -------------------------------- ")
         cls.comms = cls.init_from_conf(conf=cls.conf,
                                        single='comm',
                                        multiple='comms', skip=skip,
                                        func=init_comm_func)
+        print("cls.comm ---------------------------------- %s"%cls.comms)
         if cls.comms:
             cls.comm = cls.comms.values()[0]
         cls.server.comms = cls.comms
+        print("self.server.comms =--------------------------- %s"%cls.comms)
 
     @classmethod
     def init_schedulers(cls, init_sched_func=None, skip=None):
@@ -1049,6 +1053,7 @@ class PBSTestSuite(unittest.TestCase):
         :param vals_to_set: dict of pbs.conf values to set
         :type vals_to_set: dict
         """
+        print("INDIDE PBSCONF REVERT MOM ----------------------- ")
         svr_hostnames = [svr.hostname for svr in self.servers.values()]
         for mom in self.moms.values():
             if mom.hostname in svr_hostnames:
@@ -1056,7 +1061,9 @@ class PBSTestSuite(unittest.TestCase):
 
             new_pbsconf = dict(vals_to_set)
             restart_mom = False
-            pbs_conf_val = self.du.parse_pbs_config(mom.hostname)
+            print("BEFORE PBS CONF PARSE MOM -------------------------------------- ")
+            pbs_conf_val = self.du.parse_pbs_config(mom.hostname, platform="win32")
+            print("AFTER PARSE CONF PARSE MOM -------------------------------------- ")
             if not pbs_conf_val:
                 raise ValueError("Could not parse pbs.conf on host %s" %
                                  (mom.hostname))
@@ -1070,9 +1077,11 @@ class PBSTestSuite(unittest.TestCase):
                 else:
                     # existing pbs.conf doesn't have a default variable set
                     # Try to determine the default
+                    
                     val = self._get_dflt_pbsconfval(conf,
                                                     primary_server.hostname,
                                                     "mom", mom)
+                    
                     if val is None:
                         self.logger.error("Couldn't revert %s in pbs.conf"
                                           " to its default value" %
@@ -1116,6 +1125,7 @@ class PBSTestSuite(unittest.TestCase):
                 restart_mom = True
 
             if restart_mom:
+                print("IN RESTART MOM -------------------------- ")
                 self.du.set_pbs_config(mom.hostname, confs=new_pbsconf,
                                        append=False)
                 mom.pbs_conf = new_pbsconf
@@ -1308,9 +1318,9 @@ class PBSTestSuite(unittest.TestCase):
             server_vals_to_set["PBS_PUBLIC_HOST_NAME"] = None
 
         self._revert_pbsconf_server(server_vals_to_set)
-
-        self._revert_pbsconf_mom(primary_server, vals_to_set)
-
+        #print("before revert pbsconf mom ------------------------")
+        #self._revert_pbsconf_mom(primary_server, vals_to_set)
+        print("before revert pbsconf comm ------------------------")
         self._revert_pbsconf_comm(primary_server, vals_to_set)
 
     def revert_servers(self, force=False):
@@ -1350,18 +1360,20 @@ class PBSTestSuite(unittest.TestCase):
         """
         if not cls.use_cur_setup:
             try:
-                # Unset managers list
-                cls.server.manager(MGR_CMD_UNSET, SERVER, 'managers',
-                                   sudo=True)
                 # Unset operators list
                 cls.server.manager(MGR_CMD_UNSET, SERVER, 'operators',
+                                   sudo=True)
+                # Unset managers list
+                cls.server.manager(MGR_CMD_UNSET, SERVER, 'managers',
                                    sudo=True)
             except PbsManagerError as e:
                 self.logger.error(e.msg)
         attr = {}
-        current_user = pwd.getpwuid(os.getuid())[0] + '@*'
+        #current_user = pwd.getpwuid(os.getuid())[0] + '@*'
+        current_user = self.du.get_current_user()
         mgrs_opers = {"managers": [current_user, str(MGR_USER) + '@*'],
                       "operators": [str(OPER_USER) + '@*']}
+        print("Before SERVER STAT in add manager oper ------------------ ")
         server_stat = cls.server.status(SERVER, ["managers", "operators"])
         if len(server_stat) > 0:
             server_stat = server_stat[0]
@@ -1389,7 +1401,8 @@ class PBSTestSuite(unittest.TestCase):
             msg = 'Failed to restart server ' + server.hostname
             self.assertTrue(server.isUp(), msg)
         server_stat = server.status(SERVER)[0]
-        self.add_mgrs_opers()
+        print("SERVER STAT --------------------------------- %s " %server_stat)
+        #self.add_mgrs_opers()
         if ((self.revert_to_defaults and self.server_revert_to_defaults) or
                 force):
             server.revert_to_defaults(reverthooks=self.revert_hooks,
@@ -1408,7 +1421,8 @@ class PBSTestSuite(unittest.TestCase):
         """
         Revert the values set for comm
         """
-        rv = comm.isUp()
+        #rv = comm.isUp()
+        rv = True
         if not rv:
             self.logger.error('comm ' + comm.hostname + ' is down')
             comm.start()
@@ -1462,8 +1476,8 @@ class PBSTestSuite(unittest.TestCase):
             mom.apply_config(conf=conf, hup=False, restart=False)
         if restart:
             mom.restart()
-        else:
-            mom.signal('-HUP')
+        #else:
+        #    mom.signal('-HUP')
         if not mom.isUp():
             self.logger.error('mom ' + mom.shortname + ' is down after revert')
         self.server.manager(MGR_CMD_CREATE, NODE, None, mom.shortname)
@@ -1642,6 +1656,7 @@ class PBSTestSuite(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
+        print("TEARDOWN CLASS ----------------------------------------")
         cls._testMethodName = 'tearDownClass'
         if cls.use_cur_setup:
             PBSTestSuite.delete_current_state(cls.server, cls.moms)

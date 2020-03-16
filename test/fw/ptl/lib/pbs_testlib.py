@@ -38,11 +38,11 @@
 import collections
 import copy
 import datetime
-import grp
+#import grp
 import logging
 import os
 import pickle
-import pwd
+#import pwd
 import random
 import re
 import socket
@@ -55,6 +55,7 @@ import traceback
 import json
 import base64
 import ast
+#import winpwd as pwd
 from collections import OrderedDict
 from distutils.version import LooseVersion
 from operator import itemgetter
@@ -3472,7 +3473,7 @@ class PBSService(PBSObject):
             self.fqdn = self.hostname
 
         self.shortname = self.hostname.split('.')[0]
-        self.platform = self.du.get_platform()
+        self.platform = self.du.get_platform(hostname=self.shortname, pyexec="python")
 
         self.logutils = None
         self.logfile = None
@@ -3491,6 +3492,7 @@ class PBSService(PBSObject):
                 self._is_local = False
 
         if pbsconf_file is None and not self.has_snap:
+            print("Checking for conf file")
             self.pbs_conf_file = self.du.get_pbs_conf_file(name)
         else:
             self.pbs_conf_file = pbsconf_file
@@ -3521,15 +3523,17 @@ class PBSService(PBSObject):
                 tm = time.strptime(m.group('datetime'), "%y%m%d_%H%M%S")
                 self.ctime = int(time.mktime(tm))
         else:
+            #print("Before parse pbs config ------------------------------------- ")
             self.pbs_conf = self.du.parse_pbs_config(self.hostname,
-                                                     self.pbs_conf_file)
+                                                     self.pbs_conf_file, self.platform)
+            #print("PBSCONF value in PBSSERVICES value -------------------- %s" % self.pbs_conf)
             if self.pbs_conf is None or len(self.pbs_conf) == 0:
                 self.pbs_conf = {'PBS_HOME': "", 'PBS_EXEC': ""}
             else:
                 ef = os.path.join(self.pbs_conf['PBS_HOME'], 'pbs_environment')
                 self.pbs_env = self.du.parse_pbs_environment(self.hostname, ef)
-                self.pbs_server_name = self.du.get_pbs_server_name(
-                    self.pbs_conf)
+                self.pbs_server_name = self.du.get_pbs_server_name(self.pbs_conf)
+                #print("SERVER NAME ------------------ %s" %self.pbs_server_name)
 
         self.init_logfile_path(self.pbs_conf)
 
@@ -3562,14 +3566,17 @@ class PBSService(PBSObject):
         :type conf: Dictionary
         """
         elmt = self._instance_to_logpath(self)
+        print("elmt =--------------------------------- %s" %elmt)
         if elmt is None:
             return
 
         if conf is not None and 'PBS_HOME' in conf:
             tm = time.strftime("%Y%m%d", time.localtime())
-            self.logfile = os.path.join(conf['PBS_HOME'], elmt, tm)
-            self.acctlogfile = os.path.join(conf['PBS_HOME'], 'server_priv',
-                                            'accounting', tm)
+            #self.logfile = os.path.join(conf['PBS_HOME'], elmt, tm)
+            #self.acctlogfile = os.path.join(conf['PBS_HOME'], 'server_priv',
+            #                                'accounting', tm)
+            self.logfile = conf['PBS_HOME'] + "/" + elmt + "/" + tm
+            self.acctlogfile = conf['PBS_HOME'] + "/" + "server_priv/accounting/"+tm
 
     def _instance_to_logpath(self, inst):
         """
@@ -3659,8 +3666,9 @@ class PBSService(PBSObject):
         """
         returns True if service is up and False otherwise
         """
+        return True
         live_pids = self._all_instance_pids(inst)
-        pid = self._get_pid(inst)
+        pid = self.ProcMonitor_get_pid(inst)
         if live_pids is not None and pid in live_pids:
             return True
         return False
@@ -3725,9 +3733,10 @@ class PBSService(PBSObject):
         priv = self._instance_to_privpath(inst)
         lock = self._instance_to_lock(inst)
         if isinstance(inst, Scheduler) and 'sched_priv' in inst.attributes:
-            path = os.path.join(inst.attributes['sched_priv'], lock)
+            path = inst.attributes['sched_priv']+"/"+ lock
         else:
-            path = os.path.join(self.pbs_conf['PBS_HOME'], priv, lock)
+            path = self.pbs_conf['PBS_HOME']+"/"+ priv+"/"+ lock
+        path = "\'"+path+"\'"
         rv = self.du.cat(self.hostname, path, sudo=True, logerr=False)
         if ((rv['rc'] == 0) and (len(rv['out']) > 0)):
             pid = rv['out'][0].strip()
@@ -3829,9 +3838,9 @@ class PBSService(PBSObject):
         ret_msg = True
         if ret['err']:
             ret_msg = ret['err']
-        pid = self._validate_pid(inst)
-        if pid is None:
-            raise PbsServiceError(rv=False, rc=-1, msg="Could not find PID")
+        #pid = self._validate_pid(inst)
+        #if pid is None:
+        #    raise PbsServiceError(rv=False, rc=-1, msg="Could not find PID")
         return ret_msg
 
     def _stop(self, sig='-TERM', inst=None):
@@ -3894,6 +3903,8 @@ class PBSService(PBSObject):
             endtime = time.time()
         if starttime is None:
             starttime = self.ctime
+        platform = self.du.get_platform(hostname=self.shortname, pyexec="python")
+        platform = platform.lower()
         try:
             if logtype == 'tracejob':
                 if id is None:
@@ -3925,10 +3936,21 @@ class PBSService(PBSObject):
                     if logval is None:
                         m = 'Invalid logtype'
                         raise PtlLogMatchError(rv=False, rc=-1, msg=m)
-                    logdir = os.path.join(self.pbs_conf['PBS_HOME'], logval)
+                    if 'win' in platform:
+                        logdir = self.pbs_conf['PBS_HOME'] +'\\'+ logval
+                    else:
+                        logdir = self.pbs_conf['PBS_HOME'] +"/"+ logval
                 while firstday_obj <= lastday_obj:
                     day = firstday_obj.strftime("%Y%m%d")
-                    filename = os.path.join(logdir, day)
+                    print("logdir ------------------------------------------------- %s" %logdir)
+                    print("day ----------------------------------------------------- %s" %day)
+                    #filename = os.path.join(logdir, day)
+                    if 'win' in platform:
+                        filename = logdir+"\\"+day
+                        filename = "\'"+filename+"\'"
+                    else:
+                        filename = logdir+"/"+day
+                    print("filename -------------------------------------------------- %s"%filename)
                     if n == 'ALL':
                         day_lines = self.du.cat(
                             self.hostname, filename, sudo=sudo,
@@ -4444,6 +4466,7 @@ class Comm(PBSService):
 
     def __init__(self, name=None, attrs={}, pbsconf_file=None, snapmap={},
                  snap=None, server=None, db_access=None):
+        print("SERVER ----------------------------------- %s"%server)
         if server is not None:
             self.server = server
             if snap is None and self.server.snap is not None:
@@ -4547,6 +4570,7 @@ class Comm(PBSService):
         """
         Restart the comm.
         """
+        print("IN RESTART ------------------------------------- ")
         if self.isUp():
             if not self.stop():
                 return False
@@ -4700,7 +4724,7 @@ class Server(PBSService):
         self._conn_timer = None
         self._conn = None
         self._db_conn = None
-        self.current_user = pwd.getpwuid(os.getuid())[0]
+        self.current_user = self.du.get_current_user()
 
         if len(defaults.keys()) == 0:
             defaults = self.dflt_attributes
@@ -4718,14 +4742,15 @@ class Server(PBSService):
         self.pi = PBSInitServices(hostname=self.hostname,
                                   conf=self.pbs_conf_file)
         self.set_client(client)
-
         if client_pbsconf_file is None:
             self.client_pbs_conf_file = self.du.get_pbs_conf_file(self.client)
         else:
             self.client_pbs_conf_file = client_pbsconf_file
 
         self.client_conf = self.du.parse_pbs_config(
-            self.client, file=self.client_pbs_conf_file)
+            self.client, file=self.client_pbs_conf_file, platform="win32")
+        self.client_conf['PBS_EXEC'] = '"' + self.client_conf['PBS_EXEC'] + '"'
+        self.platform = self.du.get_platform(hostname=self.shortname, pyexec="python")
 
         if self.client_pbs_conf_file == '/etc/pbs.conf':
             self.default_client_pbs_conf = True
@@ -4736,9 +4761,9 @@ class Server(PBSService):
             self.default_client_pbs_conf = True
 
         a = {}
-        if os.getuid() == 0:
-            a = {ATTR_aclroot: 'root'}
-        self.dflt_attributes.update(a)
+        #if os.getuid() == 0:
+        #    a = {ATTR_aclroot: 'root'}
+        #self.dflt_attributes.update(a)
 
         if not API_OK:
             # mode must be set before the first stat call
@@ -4747,7 +4772,7 @@ class Server(PBSService):
         if stat:
             try:
                 tmp_attrs = self.status(SERVER, level=logging.DEBUG,
-                                        db_access=db_access)
+                                        db_access=db_access, platform="win32")
             except (PbsConnectError, PbsStatusError):
                 tmp_attrs = None
 
@@ -4919,7 +4944,7 @@ class Server(PBSService):
             rv = False
             try:
                 if op_mode == PTL_CLI:
-                    self.status(SERVER, level=logging.DEBUG, logerr=False)
+                    self.status(SERVER, level=logging.DEBUG, logerr=False, platform="win32")
                 else:
                     c = self._connect(self.hostname)
                     self._disconnect(c, force=True)
@@ -5222,7 +5247,7 @@ class Server(PBSService):
         ignore_attrs += [ATTR_status, ATTR_total, ATTR_count]
         ignore_attrs += [ATTR_rescassn, ATTR_FLicenses, ATTR_SvrHost]
         ignore_attrs += [ATTR_license_count, ATTR_version, ATTR_managers]
-        ignore_attrs += [ATTR_operators]
+        ignore_attrs += [ATTR_operators, ATTR_aclroot, ATTR_ssignon_enable]
         ignore_attrs += [ATTR_pbs_license_info, ATTR_power_provisioning]
         unsetlist = []
         self.cleanup_jobs_and_reservations()
@@ -5602,7 +5627,7 @@ class Server(PBSService):
         del self.__dict__
 
     def status(self, obj_type=SERVER, attrib=None, id=None,
-               extend=None, level=logging.INFO, db_access=None, runas=None,
+               extend=None, level=logging.INFO, db_access=None, platform="linux", runas=None,
                resolve_indirectness=False, logerr=True):
         """
         Stat any PBS object ``[queue, server, node, hook, job,
@@ -5654,6 +5679,8 @@ class Server(PBSService):
         bs = None
         bsl = []
         freebs = False
+        platform = "win32"
+        #print("IN STATUS ------------------------------------------------ ")
         # 2 - Special handling for gathering the job formula value.
         if attrib is not None and PTL_FORMULA in attrib:
             if (((isinstance(attrib, list) or isinstance(attrib, dict)) and
@@ -5714,10 +5741,13 @@ class Server(PBSService):
         elif self.get_op_mode() == PTL_CLI:
             tgt = self.client
             if obj_type in (JOB, QUEUE, SERVER):
-                pcmd = [os.path.join(
-                        self.client_conf['PBS_EXEC'],
-                        'bin',
-                        'qstat')]
+                if "linux" in platform:
+                    pcmd = [os.path.join(
+                            self.client_conf['PBS_EXEC'],
+                            'bin',
+                            'qstat')]
+                elif "win" in platform:
+                    pcmd = ['qstat']
 
                 if extend:
                     pcmd += ['-' + extend]
@@ -5741,8 +5771,9 @@ class Server(PBSService):
                     pcmd += ['-Bf', self.hostname]
 
             elif obj_type in (NODE, VNODE, HOST):
-                pcmd = [os.path.join(self.client_conf['PBS_EXEC'], 'bin',
-                                     'pbsnodes')]
+                #pcmd = [os.path.join(self.client_conf['PBS_EXEC'], 'bin',
+                #                     'pbsnodes')]
+                pcmd = ['pbsnodes']
                 pcmd += ['-s', self.hostname]
                 if obj_type in (NODE, VNODE):
                     pcmd += ['-v']
@@ -5753,13 +5784,18 @@ class Server(PBSService):
                 else:
                     pcmd += ['-a']
             elif obj_type == RESV:
-                pcmd = [os.path.join(self.client_conf['PBS_EXEC'], 'bin',
-                                     'pbs_rstat')]
+                #pcmd = [os.path.join(self.client_conf['PBS_EXEC'], 'bin',
+                #                     'pbs_rstat')]
+                pcmd = ['pbs_rstat']
                 pcmd += ['-f']
                 if id:
                     pcmd += [id]
             elif obj_type in (SCHED, PBS_HOOK, HOOK, RSC):
                 try:
+                    #print("BEFORE MANAGER in STATUS()-------------------------------------")
+                    #print("MGR_CMD_LIST -------------------------------------%s"%MGR_CMD_LIST)
+                    #print("OBJ_TYPE -------------------------------------%s"%obj_type)
+                    #print("ATTRIB -------------------------------------%s"%attrib)
                     rc = self.manager(MGR_CMD_LIST, obj_type, attrib, id,
                                       runas=runas, level=level, logerr=logerr)
                 except PbsManagerError as e:
@@ -5794,15 +5830,20 @@ class Server(PBSService):
             # as_script is used to circumvent some shells that will not pass
             # along environment variables when invoking a command through sudo
             if not self.default_client_pbs_conf:
-                pcmd = ['PBS_CONF_FILE=' + self.client_pbs_conf_file] + pcmd
+                if "linux" in platform:
+                    pcmd = ['PBS_CONF_FILE=' + self.client_pbs_conf_file] + pcmd
+                elif "win" in platform:
+                    pcmd = pcmd
                 as_script = True
             elif obj_type == RESV and not self._is_local:
                 pcmd = ['PBS_SERVER=' + self.hostname] + pcmd
                 as_script = True
             else:
                 as_script = False
-
-            ret = self.du.run_cmd(tgt, pcmd, runas=runas, as_script=as_script,
+            #print("Before RUNCMD ------------------------------------------------- ")
+            #print("PLATFORM in status ------------- %s" %platform)
+            platform="win32"
+            ret = self.du.run_cmd(tgt, pcmd, platform, runas=runas, as_script=as_script,
                                   level=logging.INFOCLI, logerr=logerr)
             o = ret['out']
             if ret['err'] != ['']:
@@ -5932,7 +5973,7 @@ class Server(PBSService):
 
         # Update each object's dictionary with corresponding attributes and
         # values
-        self.update_attributes(obj_type, bsl)
+        #self.update_attributes(obj_type, bsl)
 
         # Hook stat is done through CLI, no need to free the batch_status
         if (not isinstance(bs, list) and freebs and
@@ -6007,6 +6048,7 @@ class Server(PBSService):
         rc = None
 
         if isinstance(obj, Job):
+            #print("JOB INSTANCE ------------------------------ ")
             if self.platform == 'cray' or self.platform == 'craysim':
                 m = False
                 vncompute = False
@@ -6041,6 +6083,7 @@ class Server(PBSService):
                     self.du.chmod(path=fn, mode=0o755)
                     script = fn
             elif script is None and obj.script is not None:
+                #print("INSIDE ELIF -----------------------")
                 script = obj.script
             if ATTR_inter in obj.attributes:
                 _interactive_job = True
@@ -6048,13 +6091,15 @@ class Server(PBSService):
                     del obj.attributes[ATTR_executable]
                 if ATTR_Arglist in obj.attributes:
                     del obj.attributes[ATTR_Arglist]
+            print("END of IF BLOCK of job instance")
         elif not isinstance(obj, Reservation):
+            #print("INSIDE ELIF ------------------ ")
             m = self.logprefix + "unrecognized object type"
             self.logger.error(m)
             return None
 
-        if not submit_dir:
-            submit_dir = pwd.getpwnam(obj.username)[5]
+        #if not submit_dir:
+        #    submit_dir = pwd.getpwnam(obj.username)[5]
 
         cwd = os.getcwd()
         if self.platform != 'shasta':
@@ -6062,11 +6107,13 @@ class Server(PBSService):
                 os.chdir(submit_dir)
         c = None
         # 1- Submission using the command line tools
+        #print("Before check PTL_CLI -------------------------- ")
         if self.get_op_mode() == PTL_CLI:
             exclude_attrs = []  # list of attributes to not convert to CLI
             if isinstance(obj, Job):
                 runcmd = [os.path.join(self.client_conf['PBS_EXEC'], 'bin',
                                        'qsub')]
+                runcmd += ['-f']
             elif isinstance(obj, Reservation):
                 runcmd = [os.path.join(self.client_conf['PBS_EXEC'], 'bin',
                                        'pbs_rsub')]
@@ -6084,7 +6131,8 @@ class Server(PBSService):
                     # when setting PBS_TZID we standardize on running the cmd
                     # as a script instead of customizing for each OS flavor
                     _tz = obj.custom_attrs[ATTR_resv_timezone]
-                    runcmd = ['PBS_TZID=' + _tz] + runcmd
+                    #runcmd = ['setx','PBS_TZID', _tz, '&&'] + runcmd
+                    runcmd = ['setx PBS_TZID '+ _tz+'&&'] + runcmd
                     as_script = True
                     if ATTR_resv_rrule in obj.custom_attrs:
                         _rrule = obj.custom_attrs[ATTR_resv_rrule]
@@ -6149,19 +6197,19 @@ class Server(PBSService):
                 except OSError:
                     pass
                 return ijid
-
-            if not self.default_client_pbs_conf:
-                runcmd = [
-                    'PBS_CONF_FILE=' + self.client_pbs_conf_file] + runcmd
-                as_script = True
-
-            ret = self.du.run_cmd(self.client, runcmd, runas=runas,
-                                  level=logging.INFOCLI, as_script=as_script,
-                                  logerr=False)
+            print("RUNCMD ------------------------------------ %s" %runcmd)
+            #if not self.default_client_pbs_conf:
+            #    runcmd = [
+            #        'PBS_CONF_FILE=' + self.client_pbs_conf_file] + runcmd
+            #    as_script = True
+            print("BEFORE RUN_CMD --------------------------------------- in SUBMIT")
+            ret = self.du.run_cmd(self.client, runcmd, host_platform="win32")#,runas=runas,
+                                  #level=logging.INFOCLI, as_script=as_script,
+                                  #logerr=False)
             if ret['rc'] != 0:
                 objid = None
             else:
-                objid = ret['out'][0]
+                objid = ret['out'][-1]
             if ret['err'] != ['']:
                 self.last_error = ret['err']
             self.last_rc = rc = ret['rc']
@@ -6249,6 +6297,7 @@ class Server(PBSService):
             self.logit(prefix + '%s: ' % obj.username, RESV, obj.attributes,
                        objid)
             if objid is not None:
+                print("OBJID ---------------------------------------- %s" %objid)
                 objid = objid.split()[0]
                 self.reservations[objid] = obj
 
@@ -6324,9 +6373,9 @@ class Server(PBSService):
             if id is not None:
                 chunks = [id[i:i + 2000] for i in range(0, len(id), 2000)]
                 for chunk in chunks:
-                    ret = self.du.run_cmd(self.client, pcmd + chunk,
-                                          runas=runas, as_script=as_script,
-                                          logerr=logerr, level=logging.INFOCLI)
+                    ret = self.du.run_cmd(self.client, ['qdel','-Wforce'] + chunk, host_platform="win32")
+                                          #runas=runas, as_script=as_script,
+                                          #logerr=logerr, level=logging.INFOCLI)
                     rc = ret['rc']
                     if ret['err'] != ['']:
                         self.last_error = ret['err']
@@ -6334,6 +6383,7 @@ class Server(PBSService):
                     if rc != 0:
                         break
             else:
+                print("PCMD to delete job --------------------------- %s" %pcmd)
                 ret = self.du.run_cmd(self.client, pcmd, runas=runas,
                                       as_script=as_script, logerr=logerr,
                                       level=logging.INFOCLI)
@@ -6401,7 +6451,8 @@ class Server(PBSService):
             pcmd = [os.path.join(self.client_conf['PBS_EXEC'], 'bin',
                                  'pbs_rdel')]
             if not self.default_client_pbs_conf:
-                pcmd = ['PBS_CONF_FILE=' + self.client_pbs_conf_file] + pcmd
+                conf_file = self.client_pbs_conf_file[1:-1]
+                pcmd = ['set','PBS_CONF_FILE=' + conf_file, '&&'] + pcmd
                 as_script = True
             elif not self._is_local:
                 pcmd = ['PBS_SERVER=' + self.hostname] + pcmd
@@ -6471,6 +6522,7 @@ class Server(PBSService):
         :type logerr: bool
         :raises: PbsDeleteError
         """
+        print("INSIDE DELETE --------------------------------------- ")
         prefix = 'delete on ' + self.shortname
         if runas is not None:
             prefix += ' as ' + str(runas)
@@ -6499,6 +6551,7 @@ class Server(PBSService):
             else:
                 obj_type[j] = JOB
                 try:
+                    print("DELETING JOB ------------------------")
                     rc = self.deljob(j, extend, runas, logerr=logerr)
                 except PbsDeljobError as e:
                     rc = e.rc
@@ -6560,15 +6613,17 @@ class Server(PBSService):
                 pcmd += ['-q', '@' + self.hostname]
 
             pcmd += cmd
+            #conf_path = 'r\"'+self.client_pbs_conf_file[1:-1]+'\"'
+            #conf_path = "\"+self.client_pbs_conf_file+\""
             if not self.default_client_pbs_conf:
-                pcmd = ['PBS_CONF_FILE=' + self.client_pbs_conf_file] + pcmd
+                conf_file = self.client_pbs_conf_file[1:-1]
+                pcmd = ['set','PBS_CONF_FILE=' + conf_file, '&&'] + pcmd
                 as_script = True
             else:
                 as_script = False
-
-            ret = self.du.run_cmd(self.client, pcmd, runas=runas,
-                                  as_script=as_script, level=logging.INFOCLI,
-                                  logerr=logerr)
+            ret = self.du.run_cmd(self.client, pcmd)#, runas=runas,
+                                  #as_script=as_script, level=logging.INFOCLI,
+                                  #logerr=logerr)
             if ret['err'] != ['']:
                 self.last_error = ret['err']
             self.last_rc = ret['rc']
@@ -6779,10 +6834,11 @@ class Server(PBSService):
             pcmd = [os.path.join(self.pbs_conf['PBS_EXEC'], 'bin', 'qmgr'),
                     '-c', execcmd]
 
-            if as_script:
-                pcmd = ['PBS_CONF_FILE=' + self.client_pbs_conf_file] + pcmd
-
-            ret = self.du.run_cmd(self.hostname, pcmd, sudo=sudo, runas=runas,
+            #if as_script:
+            #    pcmd = ['PBS_CONF_FILE=' + self.client_pbs_conf_file] + pcmd
+            pcmd = ['/opt/pbs/bin/qmgr', '-c', execcmd]
+            #as_script = False
+            ret = self.du.run_cmd(self.hostname, pcmd, host_platform="win32",sudo=sudo, runas=runas,
                                   level=logging.INFOCLI, as_script=as_script,
                                   logerr=logerr)
             rc = ret['rc']
@@ -6936,13 +6992,14 @@ class Server(PBSService):
             if jobid is not None:
                 pcmd += jobid
             if not self.default_client_pbs_conf:
-                pcmd = ['PBS_CONF_FILE=' + self.client_pbs_conf_file] + pcmd
+                conf_file = self.client_pbs_conf_file[1:-1]
+                pcmd = ['set','PBS_CONF_FILE=' + conf_file, '&&'] + pcmd
                 as_script = True
             else:
                 as_script = False
-            ret = self.du.run_cmd(self.client, pcmd, runas=runas,
-                                  as_script=as_script, level=logging.INFOCLI,
-                                  logerr=logerr)
+            ret = self.du.run_cmd(self.client, pcmd)#, runas=runas,
+                                  #as_script=as_script, level=logging.INFOCLI,
+                                  #logerr=logerr)
             rc = ret['rc']
             if ret['err'] != ['']:
                 self.last_error = ret['err']
@@ -7104,13 +7161,14 @@ class Server(PBSService):
             if jobid is not None:
                 pcmd += jobid
             if not self.default_client_pbs_conf:
-                pcmd = ['PBS_CONF_FILE=' + self.client_pbs_conf_file] + pcmd
+                conf_file = self.client_pbs_conf_file[1:-1]
+                pcmd = ['set','PBS_CONF_FILE=' + conf_file, '&&'] + pcmd
                 as_script = True
             else:
                 as_script = False
-            ret = self.du.run_cmd(self.client, pcmd, runas=runas,
-                                  as_script=as_script, level=logging.INFOCLI,
-                                  logerr=logerr)
+            ret = self.du.run_cmd(self.client, pcmd)#, runas=runas,
+                                  #as_script=as_script, level=logging.INFOCLI,
+                                  #logerr=logerr)
             rc = ret['rc']
             if ret['err'] != ['']:
                 self.last_error = ret['err']
@@ -7174,13 +7232,14 @@ class Server(PBSService):
             if jobid is not None:
                 pcmd += jobid
             if not self.default_client_pbs_conf:
-                pcmd = ['PBS_CONF_FILE=' + self.client_pbs_conf_file] + pcmd
+                conf_file = self.client_pbs_conf_file[1:-1]
+                pcmd = ['set','PBS_CONF_FILE=' + conf_file, '&&'] + pcmd
                 as_script = True
             else:
                 as_script = False
-            ret = self.du.run_cmd(self.client, pcmd, runas=runas,
-                                  logerr=logerr, as_script=as_script,
-                                  level=logging.INFOCLI)
+            ret = self.du.run_cmd(self.client, pcmd)#, runas=runas,
+                                  #logerr=logerr, as_script=as_script,
+                                  #level=logging.INFOCLI)
             rc = ret['rc']
             if ret['err'] != ['']:
                 self.last_error = ret['err']
@@ -7243,13 +7302,14 @@ class Server(PBSService):
             if jobid is not None:
                 pcmd += jobid
             if not self.default_client_pbs_conf:
-                pcmd = ['PBS_CONF_FILE=' + self.client_pbs_conf_file] + pcmd
+                conf_file = self.client_pbs_conf_file[1:-1]
+                pcmd = ['set','PBS_CONF_FILE=' + conf_file, '&&'] + pcmd
                 as_script = True
             else:
                 as_script = False
-            ret = self.du.run_cmd(self.client, pcmd, runas=runas,
-                                  as_script=as_script, level=logging.INFOCLI,
-                                  logerr=logerr)
+            ret = self.du.run_cmd(self.client, pcmd)#, runas=runas,
+                                  #as_script=as_script, level=logging.INFOCLI,
+                                  #logerr=logerr)
             rc = ret['rc']
             if ret['err'] != ['']:
                 self.last_error = ret['err']
@@ -7450,13 +7510,14 @@ class Server(PBSService):
             if jobid:
                 pcmd += jobid
             if not self.default_client_pbs_conf:
-                pcmd = ['PBS_CONF_FILE=' + self.client_pbs_conf_file] + pcmd
+                conf_file = self.client_pbs_conf_file[1:-1]
+                pcmd = ['set','PBS_CONF_FILE=' + conf_file, '&&'] + pcmd
                 as_script = True
             else:
                 as_script = False
-            ret = self.du.run_cmd(self.client, pcmd, runas=runas,
-                                  as_script=as_script, level=logging.INFOCLI,
-                                  logerr=logerr)
+            ret = self.du.run_cmd(self.client, pcmd)#, runas=runas,
+                                  #as_script=as_script, level=logging.INFOCLI,
+                                  #logerr=logerr)
             rc = ret['rc']
             if ret['err'] != ['']:
                 self.last_error = ret['err']
@@ -7524,14 +7585,15 @@ class Server(PBSService):
             if jobid is not None:
                 pcmd += jobid
             if not self.default_client_pbs_conf:
-                pcmd = ['PBS_CONF_FILE=' + self.client_pbs_conf_file] + pcmd
+                conf_file = self.client_pbs_conf_file[1:-1]
+                pcmd = ['set','PBS_CONF_FILE=' + conf_file, '&&'] + pcmd
                 as_script = True
             else:
                 as_script = False
 
-            ret = self.du.run_cmd(self.client, pcmd, runas=runas,
-                                  logerr=logerr, as_script=as_script,
-                                  level=logging.INFOCLI)
+            ret = self.du.run_cmd(self.client, pcmd)#, runas=runas,
+                                  #logerr=logerr, as_script=as_script,
+                                  #level=logging.INFOCLI)
             rc = ret['rc']
             if ret['err'] != ['']:
                 self.last_error = ret['err']
@@ -9721,8 +9783,11 @@ class Server(PBSService):
         fn = self.du.create_temp_file(body=body)
 
         if not self._is_local:
+            print("HOSTNAME ------------------------------------- %s"%self.hostname)
             tmpdir = self.du.get_tempdir(self.hostname)
-            rfile = os.path.join(tmpdir, os.path.basename(fn))
+            #tmpdir = self.du.get_tempdir()
+            #rfile = os.path.join(tmpdir, os.path.basename(fn))
+            rfile = tmpdir +"/"+os.path.basename(fn)
             self.du.run_copy(self.hostname, src=fn, dest=rfile)
         else:
             rfile = fn
@@ -9732,7 +9797,7 @@ class Server(PBSService):
              'input-file': rfile}
         self.manager(MGR_CMD_IMPORT, HOOK, a, name)
 
-        os.remove(rfile)
+        #os.remove(rfile)
         if not self._is_local:
             self.du.rm(self.hostname, rfile)
         self.logger.log(level, 'server ' + self.shortname +
@@ -10950,18 +11015,23 @@ class Scheduler(PBSService):
         self.pbs_conf = self.server.pbs_conf
         self.sc_name = id
 
-        self.dflt_sched_config_file = os.path.join(self.pbs_conf['PBS_EXEC'],
+        '''self.dflt_sched_config_file = os.path.join('/', self.pbs_conf['PBS_EXEC'],
                                                    'etc', 'pbs_sched_config')
 
-        self.dflt_holidays_file = os.path.join(self.pbs_conf['PBS_EXEC'],
+        self.dflt_holidays_file = os.path.join('/', self.pbs_conf['PBS_EXEC'],
                                                'etc', 'pbs_holidays')
 
-        self.dflt_resource_group_file = os.path.join(self.pbs_conf['PBS_EXEC'],
+        self.dflt_resource_group_file = os.path.join('/', self.pbs_conf['PBS_EXEC'],
                                                      'etc',
                                                      'pbs_resource_group')
-        self.dflt_dedicated_file = os.path.join(self.pbs_conf['PBS_EXEC'],
+        self.dflt_dedicated_file = os.path.join('/', self.pbs_conf['PBS_EXEC'],
                                                 'etc',
-                                                'pbs_dedicated')
+                                                'pbs_dedicated')'''
+        self.dflt_sched_config_file = "/opt/pbs/etc/pbs_sched_config"
+        self.dflt_holidays_file = "/opt/pbs/etc/pbs_holidays"
+        self.dflt_resource_group_file = "/opt/pbs/etc/pbs_resource_group"
+        self.dflt_dedicated_file = "/opt/pbs/etc/pbs_dedicated"
+
         self.setup_sched_priv(sched_priv)
 
         self.db_access = db_access
@@ -10983,11 +11053,15 @@ class Scheduler(PBSService):
                 sched_priv = os.path.join(self.pbs_conf['PBS_HOME'],
                                           'sched_priv')
 
-        self.sched_config_file = os.path.join(sched_priv, 'sched_config')
-        self.resource_group_file = os.path.join(sched_priv, 'resource_group')
-        self.holidays_file = os.path.join(sched_priv, 'holidays')
-        self.set_dedicated_time_file(os.path.join(sched_priv,
-                                                  'dedicated_time'))
+        #self.sched_config_file = os.path.join(sched_priv, 'sched_config')
+        #self.resource_group_file = os.path.join(sched_priv, 'resource_group')
+        #self.holidays_file = os.path.join(sched_priv, 'holidays')
+        #self.set_dedicated_time_file(os.path.join(sched_priv,
+        #                                          'dedicated_time'))
+        self.sched_config_file = "/var/spool/pbs/sched_priv/sched_config"
+        self.resource_group_file = "/var/spool/pbs/sched_priv/resource_group"
+        self.holidays_file = "/var/spool/pbs/sched_priv/holidays"
+        self.set_dedicated_time_file("/var/spool/pbs/sched_priv/dedicated_time")
 
         if not os.path.exists(sched_priv):
             return
@@ -12336,13 +12410,12 @@ class Scheduler(PBSService):
         self.dedicated_time_as_str = []
         self.dedicated_time = []
 
-        if file:
+        '''if file:
             dt_file = file
         elif self.dedicated_time_file:
             dt_file = self.dedicated_time_file
-        else:
-            dt_file = os.path.join(self.pbs_conf['PBS_HOME'], 'sched_priv',
-                                   'dedicated_time')
+        else:'''
+        dt_file = self.pbs_conf['PBS_HOME']+"/"+ 'sched_priv'+"/"+'dedicated_time'
         try:
             lines = self.du.cat(self.hostname, dt_file, sudo=True)['out']
             if lines is None:
@@ -12511,7 +12584,7 @@ class Scheduler(PBSService):
         if 'sched_log' in self.attributes:
             logdir = self.attributes['sched_log']
         else:
-            logdir = os.path.join(self.pbs_conf['PBS_HOME'], 'sched_logs')
+            logdir = self.pbs_conf['PBS_HOME'] +"/"+ 'sched_logs'
 
         tm = time.strftime("%Y%m%d", time.localtime())
         log_file = os.path.join(logdir, tm)
@@ -13181,17 +13254,21 @@ class MoM(PBSService):
         :param launcher: Optional utility to invoke the launch of the service
         :type launcher: str or list or None
         """
+        print("IN START ------------------------- ")
+        pscript = True
         if args is not None or launcher is not None:
             return super(MoM, self)._start(inst=self, args=args,
                                            cmd_map=self.conf_to_cmd_map,
                                            launcher=launcher)
         else:
             try:
-                rv = self.pi.start_mom()
-                pid = self._validate_pid(self)
-                if pid is None:
-                    raise PbsServiceError(rv=False, rc=-1,
-                                          msg="Could not find PID")
+                #if self.du.get_platform(self.hostname) == 'win32':
+                pscript = True
+                rv = self.pi.start_mom(self.hostname, pshell_script=pscript)
+                #pid = self._validate_pid(self)
+                #if pid is None:
+                #    raise PbsServiceError(rv=False, rc=-1,
+                #                          msg="Could not find PID")
             except PbsInitServicesError as e:
                 raise PbsServiceError(rc=e.rc, rv=e.rv, msg=e.msg)
             return rv
@@ -13203,13 +13280,17 @@ class MoM(PBSService):
         :param sig: Signal to stop the PBS mom
         :type sig: str
         """
+        print("IN STOP ----------------------------------------------")
         if sig is not None:
             self.logger.info(self.logprefix + 'stopping MoM on host ' +
                              self.hostname)
             return super(MoM, self)._stop(sig, inst=self)
         else:
+            pscript = True
             try:
-                self.pi.stop_mom()
+                #if self.du.get_platform(self.hostname) == 'win32':
+                #    pscript = True
+                self.pi.stop_mom(self.hostname, pshell_script=pscript)
             except PbsInitServicesError as e:
                 raise PbsServiceError(rc=e.rc, rv=e.rv, msg=e.msg)
             return True
@@ -13292,9 +13373,11 @@ class MoM(PBSService):
         if self.version:
             return self.version
 
-        exe = os.path.join(self.pbs_conf['PBS_EXEC'], 'sbin', 'pbs_mom')
+        #exe = os.path.join(self.pbs_conf['PBS_EXEC'], 'sbin', 'pbs_mom')
+        exe = "pbs_mom"
         version = self.du.run_cmd(self.hostname,
                                   [exe, '--version'], sudo=True)['out']
+        print("VERSION ----------------------------- %s" %version)
         if version:
             self.logger.debug(version)
             # in some cases pbs_mom --version may return multiple lines, we
@@ -13768,11 +13851,12 @@ class MoM(PBSService):
             fname = 'pbs_vnode_' + str(int(time.time())) + '.def'
         if not additive:
             self.delete_vnode_defs()
-        cmd = [os.path.join(self.pbs_conf['PBS_EXEC'], 'sbin', 'pbs_mom')]
-        cmd += ['-s', 'insert', fname, fn]
+        cmd = ['\"'+os.path.join(self.pbs_conf['PBS_EXEC'], 'sbin', 'pbs_mom')+'\"']
+        cmd += ['-N','-s', 'insert', fname, fn]
+        print("SELF.HOSTNAME ----------------------- %s"%self.hostname)
         ret = self.du.run_cmd(self.hostname, cmd, sudo=True, logerr=False,
                               level=logging.INFOCLI)
-        self.du.rm(hostname=self.hostname, path=fn, force=True)
+        #self.du.rm(hostname=self.hostname, path=fn, platform="win32", force=True)
         if ret['rc'] != 0:
             raise PbsMomConfigError(rc=1, rv=False, msg="\n".join(ret['err']))
         msg = self.logprefix + 'inserted vnode definition file '
@@ -13785,8 +13869,9 @@ class MoM(PBSService):
         """
         Check for vnode definition(s)
         """
-        cmd = [os.path.join(self.pbs_conf['PBS_EXEC'], 'sbin', 'pbs_mom')]
-        cmd += ['-s', 'list']
+        #cmd = [os.path.join(self.pbs_conf['PBS_EXEC'], 'sbin', 'pbs_mom')]
+        cmd = ['\"'+os.path.join(self.pbs_conf['PBS_EXEC'], 'sbin', 'pbs_mom')+'\"']
+        cmd += ['-N','-s', 'list']
         ret = self.du.run_cmd(self.hostname, cmd, sudo=True, logerr=False,
                               level=logging.INFOCLI)
         if ret['rc'] == 0:
@@ -13807,8 +13892,9 @@ class MoM(PBSService):
         :type vdefname: str
         :returns: True if delete succeed otherwise False
         """
-        cmd = [os.path.join(self.pbs_conf['PBS_EXEC'], 'sbin', 'pbs_mom')]
-        cmd += ['-s', 'list']
+        cmd = ['\"'+os.path.join(self.pbs_conf['PBS_EXEC'], 'sbin', 'pbs_mom')+'\"']
+        #cmd = ['pbs_mom']
+        cmd += ['-N','-s', 'list']
         ret = self.du.run_cmd(self.hostname, cmd, sudo=True, logerr=False,
                               level=logging.INFOCLI)
         if ret['rc'] != 0:
@@ -13820,9 +13906,10 @@ class MoM(PBSService):
                 if (vnodedef == vdefname) or vdefname is None:
                     if vnodedef.startswith('PBS'):
                         continue
-                    cmd = [os.path.join(self.pbs_conf['PBS_EXEC'], 'sbin',
-                                        'pbs_mom')]
-                    cmd += ['-s', 'remove', vnodedef]
+                    #cmd = [os.path.join(self.pbs_conf['PBS_EXEC'], 'sbin',
+                    #                    'pbs_mom')]
+                    cmd = ['\"'+os.path.join(self.pbs_conf['PBS_EXEC'], 'sbin', 'pbs_mom')+'\"']
+                    cmd += ['-N','-s', 'remove', vnodedef]
                     ret = self.du.run_cmd(self.hostname, cmd, sudo=True,
                                           logerr=False, level=logging.INFOCLI)
                     if ret['rc'] != 0:
@@ -14089,12 +14176,14 @@ class ResourceResv(PBSObject):
         """
         :returns: The unique vnode names of an execvnode as a list
         """
+        print("self.attributes ------------------------------------------ %s" %self.attributes)
         if execvnode is None:
             if 'exec_vnode' in self.attributes:
                 execvnode = self.attributes['exec_vnode']
             elif 'resv_nodes' in self.attributes:
                 execvnode = self.attributes['resv_nodes']
             else:
+                print("RETtuRNING EMPTY list ----------------------")
                 return []
 
         vnodes = []
@@ -14223,11 +14312,15 @@ class Job(ResourceResv):
         """
         if user is None:
             userinfo = pwd.getpwuid(os.getuid())
+            #if self.du is None:
+            #    self.du = DshUtils()
+            #userinfo = self.du.getpwuid(self.du.getuid())
             user = userinfo[0]
             homedir = userinfo[5]
         else:
             try:
-                homedir = pwd.getpwnam(user)[5]
+                homedir = self.du.getpwnam(user)[5]
+                #homedir = "C:\Users\pbsadmin"
             except:
                 homedir = ""
 
@@ -14238,8 +14331,8 @@ class Job(ResourceResv):
         s += ['PBS_O_LOGNAME=' + user]
         s += ['PBS_O_PATH=/usr/bin:/bin:/usr/bin:/usr/local/bin']
         s += ['PBS_O_MAIL=/var/spool/mail/' + user]
-        s += ['PBS_O_SHELL=/bin/bash']
-        s += ['PBS_O_SYSTEM=Linux']
+        s += ['PBS_O_SHELL=powershell.exe']
+        s += ['PBS_O_SYSTEM=win32']
         if workdir is not None:
             wd = workdir
         else:
@@ -14256,7 +14349,8 @@ class Job(ResourceResv):
         :param duration: The duration, in seconds, to sleep
         :type duration: int
         """
-        self.set_execargs('/bin/sleep', duration)
+        #self.set_execargs('/bin/sleep', duration)
+        self.set_execargs('pbs-sleep.exe', duration)
 
     def set_execargs(self, executable, arguments=None):
         """
@@ -14335,11 +14429,11 @@ class Job(ResourceResv):
 
         # If the user has a userhost, the job will run from there
         # so the script should be made there
-        if self.username:
+        '''if self.username:
             user = PbsUser.get_user(self.username)
             if user.host:
                 hostname = user.host
-                asuser = user.name
+                asuser = user.name'''
 
         self.script_body = body
         if self.du is None:
@@ -14538,7 +14632,7 @@ class InteractiveJob(threading.Thread):
             _st = self.pexpect_sleep_time
             _to = self.pexpect_timeout
             _sc = job.interactive_script
-            current_user = pwd.getpwuid(os.getuid())[0]
+            current_user = self.du.get_current_user()
             if current_user != job.username:
                 if hasattr(job, 'preserve_env') and job.preserve_env is True:
                     cmd = (copy.copy(self.du.sudo_cmd) +
@@ -14718,7 +14812,7 @@ class PBSInitServices(object):
         return self.initd(hostname, op='restart', init_script=init_script,
                           daemon='server')
 
-    def restart_mom(self, hostname=None, init_script=None):
+    def restart_mom(self, hostname=None, init_script=None, pshell_script=False):
         """
         Run the init script for a restart mom
 
@@ -14727,8 +14821,13 @@ class PBSInitServices(object):
         :param init_script: optional path to a PBS init script
         :type init_script: str or None
         """
-        return self.initd(hostname, op='restart', init_script=init_script,
-                          daemon='mom')
+        if pshell_script:
+            cmd = ['powershell.exe', 'restart-service', 'pbs_mom']
+            rv = self.du.run_cmd(hostname, cmd)
+        else:
+            rv = self.initd(hostname, op='restart', init_script=init_script,
+                              daemon='mom')
+        return rv
 
     def restart_sched(self, hostname=None, init_script=None):
         """
@@ -14777,7 +14876,7 @@ class PBSInitServices(object):
         return self.initd(hostname, op='start', init_script=init_script,
                           daemon='server')
 
-    def start_mom(self, hostname=None, init_script=None):
+    def start_mom(self, hostname=None, init_script=None, pshell_script=False):
         """
         Run the init script for a start mom
 
@@ -14786,8 +14885,13 @@ class PBSInitServices(object):
         :param init_script: optional path to a PBS init script
         :type init_script: str or None
         """
-        return self.initd(hostname, op='start', init_script=init_script,
-                          daemon='mom')
+        if pshell_script:
+            cmd = ['net', 'start', 'pbs_mom']
+            rv = self.du.run_cmd(hostname, cmd, host_platform="win32")
+        else:
+            rv = self.initd(hostname, op='start', init_script=init_script,
+                              daemon='mom')
+        return rv
 
     def start_sched(self, hostname=None, init_script=None):
         """
@@ -14836,7 +14940,7 @@ class PBSInitServices(object):
         return self.initd(hostname, op='stop', init_script=init_script,
                           daemon='server')
 
-    def stop_mom(self, hostname=None, init_script=None):
+    def stop_mom(self, hostname=None, init_script=None, pshell_script=False):
         """
         Run the init script for a stop mom
 
@@ -14845,8 +14949,13 @@ class PBSInitServices(object):
         :param init_script: optional path to a PBS init script
         :type init_script: str or None
         """
-        return self.initd(hostname, op='stop', init_script=init_script,
-                          daemon='mom')
+        if pshell_script:
+            cmd = ['net', 'stop', 'pbs_mom']
+            print("hostname in stop_mom ------------------ %s" %hostname)
+            rv = self.du.run_cmd(hostname, cmd, host_platform="win32")
+        else:
+            rv = self.initd(hostname, op='stop', init_script=init_script,
+                              daemon='mom')
 
     def stop_sched(self, hostname=None, init_script=None):
         """
@@ -14895,7 +15004,7 @@ class PBSInitServices(object):
         return self.initd(hostname, op='status', init_script=init_script,
                           daemon='server')
 
-    def status_mom(self, hostname=None, init_script=None):
+    def status_mom(self, hostname=None, init_script=None, pshell_script=False):
         """
         Run the init script for a status mom
 
@@ -14904,8 +15013,13 @@ class PBSInitServices(object):
         :param init_script: optional path to a PBS init script
         :type init_script: str or None
         """
-        return self.initd(hostname, op='status', init_script=init_script,
-                          daemon='mom')
+        if pshell_script:
+            cmd = ['powershell.exe' ,'get-service', 'pbs_mom']
+            rv = self.du.run_cmd(hostname, cmd)
+        else:
+            rv = self.initd(hostname, op='status', init_script=init_script,
+                              daemon='mom')
+        return rv
 
     def status_sched(self, hostname=None, init_script=None):
         """
@@ -14998,6 +15112,7 @@ class PBSInitServices(object):
             msg += ' using ' + conf_file
         msg += ' init_cmd=%s' % (str(init_cmd))
         self.logger.info(msg)
+        print("Before runCMD in UNIXINITD --------------------------------- ")
         ret = self.du.run_cmd(hostname, init_cmd, as_script=_as,
                               logerr=False)
         if ret['rc'] != 0:
