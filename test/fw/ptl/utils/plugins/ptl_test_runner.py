@@ -1001,7 +1001,7 @@ class PTLTestRunner(Plugin):
                 ftd.extend([f for f in files if bn(f).startswith('pbs.conf.')])
                 ftd.extend([f for f in files if p.match(bn(f))])
             for f in ftd:
-                du.rm(path=f, platform="win32", sudo=True, recursive=False, force=True,
+                du.rm(path=f, platform="win32", sudo=True, recursive=True, force=True,
                       level=logging.DEBUG)
         for f in du.tmpfilelist:
             du.rm(path=f, platform="win32",sudo=True, force=True, level=logging.DEBUG)

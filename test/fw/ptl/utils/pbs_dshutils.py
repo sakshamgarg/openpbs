@@ -203,7 +203,7 @@ class DshUtils(object):
             found_already = True
         if not self.is_localhost(hostname) and not found_already:
             if pyexec is None:
-                pyexec = self.which(hostname, 'python3', level=logging.DEBUG2)
+                pyexec = self.which(hostname, exe='python3', level=logging.DEBUG2)
             cmd = [pyexec, '-c', '"import sys; print(sys.platform)"']
             ret = self.run_cmd(hostname, cmd=cmd)
             if ret['rc'] != 0 or len(ret['out']) == 0:
@@ -236,7 +236,7 @@ class DshUtils(object):
             return self._h2pu[hostname]
         if not self.is_localhost(hostname):
             if pyexec is None:
-                pyexec = self.which(hostname, 'python3', level=logging.DEBUG2)
+                pyexec = self.which(hostname, exe='python3', level=logging.DEBUG2)
             #pyexec = "python"
             _cmdstr = '"import platform;'
             _cmdstr += 'print(\' \'.join(platform.uname()))"'
@@ -272,7 +272,7 @@ class DshUtils(object):
             return self._h2osinfo[hostname]
 
         if pyexec is None:
-            pyexec = self.which(hostname, 'python3', level=logging.DEBUG2)
+            pyexec = self.which(hostname, exe='python3', level=logging.DEBUG2)
 
         cmd = [pyexec, '-c',
                '"import platform; print(platform.platform())"']
@@ -303,7 +303,6 @@ class DshUtils(object):
                 #print("Before linux cat --------------")
                 rv = self.cat(hostname, file, level=logging.DEBUG2, logerr=False)
             elif "win" in platform:
-                #print("Before windows CAT -------------------- ")
                 rv = self.cat(hostname, file, platform="win32", level=logging.DEBUG2, logerr=False)
             #cmd = ["type", file]
             #rv = self.run_cmd(hostname, cmd)
@@ -398,8 +397,8 @@ class DshUtils(object):
             dflt_conf = '/etc/pbs.conf'
             dflt_python = '/opt/pbs/python/bin/python'
         elif platform == 'win32':
-            dflt_conf = 'C:\Program Files (x86)\PBS\pbs.conf'
-            dflt_python = 'C:\Program Files (x86)\PBS\exec\python\python.exe'
+            dflt_conf = "C:\Program Files (x86)\PBS\pbs.conf"
+            dflt_python = "C:\Program Files (x86)\PBS\exec\python\python.exe"
 
         if hostname is None:
             hostname = socket.gethostname()
@@ -440,7 +439,6 @@ class DshUtils(object):
         """
         if file is None:
             file = self.get_pbs_conf_file(hostname, platform)
-        
         return self._parse_file(hostname, file, platform)
 
     def set_pbs_config(self, hostname=None, fin=None, fout=None,
@@ -690,7 +688,7 @@ class DshUtils(object):
             with open(fn, 'w') as fd:
                 fd.write('#!/bin/bash\n')
                 fd.write('cd %s\n' % (home))
-                fd.write('%s -rf %s\n' % (self.which(hostname, 'rm',
+                fd.write('%s -rf %s\n' % (self.which(hostname, exe='rm',
                                                      level=logging.DEBUG2),
                                           rhost))
                 fd.write('touch %s\n' % (rhost))
@@ -704,7 +702,7 @@ class DshUtils(object):
                     else:
                         l = 'echo "%s %s" >> %s\n' % (str(k), str(v), rhost)
                         fd.write(l)
-                fd.write('%s 0600 %s\n' % (self.which(hostname, 'chmod',
+                fd.write('%s 0600 %s\n' % (self.which(hostname, exe='chmod',
                                                       level=logging.DEBUG2),
                                            rhost))
             ret = self.run_cmd(hostname, cmd=fn, runas=uid)
@@ -1215,7 +1213,7 @@ class DshUtils(object):
 
         if runas:
             #_runas_user = PbsUser.get_user(runas)
-            _runas_user = "pbsadmin"
+            _runas_user = "saksham"
 
         if isinstance(cmd, str):
             cmd = cmd.split()
@@ -1283,7 +1281,7 @@ class DshUtils(object):
                         user = _runas_user.name
                     rshcmd = self.rsh_cmd + ['-p', port, user + '@' + hostname]
                 elif platform == "win32":
-                    rshcmd = self.rsh_cmd + ["pbsadmin@" + hostname]
+                    rshcmd = self.rsh_cmd + ["saksham@" + hostname]
                     #print("---------RSH_CMD--------------------------- %s" %rshcmd)
                 else:
                     rshcmd = self.rsh_cmd + [hostname]
@@ -1324,7 +1322,7 @@ class DshUtils(object):
                     # assume that the remote host has a similar file
                     # system layout
                     #print("INSIDE run_cmd if or islocal---------------------------")
-                    self.run_copy(hostname, _script, _script,
+                    self.run_copy(hostname, src=_script, dest=_script,
                                   runas=runas, level=level)
                     os.remove(_script)
                 runcmd = rshcmd + sudocmd + [_script]
@@ -1407,22 +1405,23 @@ class DshUtils(object):
             self.logger.debug('rc: ' + str(ret['rc']))
         if len(ret['err']) > 0 or ret['rc'] != 0:
             print("DSHUTILS return ---------------------------------- %s" %ret)
+            #print((traceback.print_stack()))
 
         return ret
 
-    '''def run_copy(self, hosts=None, src=None, dest=None, sudo=False, uid=None,
-                 gid=None, mode=None, env=None, logerr=True,
-                 recursive=False, runas=None, preserve_permission=True,
-                 level=logging.INFOCLI2):
+    '''def run_copy(self, hosts=None, srchost=None, src=None, dest=None,
+                 sudo=False, uid=None, gid=None, mode=None, env=None,
+                 logerr=True, recursive=False, runas=None,
+                 preserve_permission=True, level=logging.INFOCLI2):
         """
         copy a file or directory to specified target hosts.
 
         :param hosts: the host(s) to which to copy the data. Can be
                       a comma-separated string or a list
         :type hosts: str or None
-        :param src: the path to the file or directory to copy. If
-                    src is remote,it must be prefixed by the
-                    hostname. ``e.g. remote1:/path,remote2:/path``
+        :param srchost: the host on which the src file resides.
+        :type srchost: str or None
+        :param src: the path to the file or directory to copy.
         :type src: str or None
         :param dest: the destination path.
         :type dest: str or None
@@ -1475,11 +1474,12 @@ class DshUtils(object):
             sudo = False
 
         runas = PbsUser.get_user(runas)
-        #runas = "pbsadmin"
-
+        issrclocal = None
+        if srchost:
+            issrclocal = self.is_localhost(srchost)
         for targethost in hosts:
             islocal = self.is_localhost(targethost)
-            if sudo and not islocal:
+            if sudo and not islocal and not issrclocal:
                 # to avoid a file copy as root, we copy it as current user
                 # and move it remotely to the desired path/name.
                 # First, get a remote temporary filename
@@ -1506,26 +1506,40 @@ class DshUtils(object):
 
             # Remote copy if target host is remote or if source file/dir is
             # remote.
-            if ((not islocal) or (':' in src)):
+            if srchost:
+                srchost = socket.getfqdn(srchost)
+            if ((not islocal) or (srchost)):
                 copy_cmd = copy.deepcopy(self.copy_cmd)
-                if not preserve_permission:
-                    copy_cmd.remove('-p')
-                if copy_cmd[0][0] != '/':
-                    copy_cmd[0] = self.which(targethost, copy_cmd[0],
-                                             level=level)
-                cmd += copy_cmd
-                if recursive:
-                    cmd += ['-r']
-                #if runas and runas.port:
-                #    cmd += ['-P', runas.port]
-                cmd += [src]
-                if islocal:
+                targethost = socket.getfqdn(targethost)
+                if (srchost == targethost):
+                    cmd += [self.which(targethost, 'cp', level=level)]
+                    if preserve_permission:
+                        cmd += ['-p']
+                    if recursive:
+                        cmd += ['-r']
+                    cmd += [src]
                     cmd += [dest]
                 else:
-                    if self.get_platform() == 'shasta' and runas:
-                        cmd += [str(runas) + '@' + targethost + ':' + dest]
+                    if not preserve_permission:
+                        copy_cmd.remove('-p')
+                    if copy_cmd[0][0] != '/':
+                        copy_cmd[0] = self.which(targethost, copy_cmd[0],
+                                                 level=level)
+                    cmd += copy_cmd
+                    if recursive:
+                        cmd += ['-r']
+                    if runas and runas.port:
+                        cmd += ['-P', runas.port]
+                    if srchost:
+                        src = srchost + ':' + src
+                    cmd += [src]
+                    if islocal:
+                        cmd += [dest]
                     else:
-                        cmd += [targethost + ':' + dest]
+                        if self.get_platform() == 'shasta' and runas:
+                            cmd += [str(runas) + '@' + targethost + ':' + dest]
+                        else:
+                            cmd += [targethost + ':' + dest]
             else:
                 cmd += [self.which(targethost, 'cp', level=level)]
                 if preserve_permission:
@@ -1533,14 +1547,18 @@ class DshUtils(object):
                 if recursive:
                     cmd += ['-r']
                 cmd += [src]
-                cmd = cmd + [dest]
+                cmd += [dest]
 
-            if self.get_platform() == 'shasta':
+            if srchost == targethost:
+                ret = self.run_cmd(targethost, cmd, env=env,
+                                   runas=runas, logerr=logerr, level=level)
+            elif self.get_platform() == 'shasta':
                 ret = self.run_cmd(socket.gethostname(), cmd, env=env,
                                    logerr=logerr, level=level)
             else:
-                ret = self.run_cmd(socket.gethostname(), cmd, host_platform="win32", env=env,
+                ret = self.run_cmd(socket.gethostname(), cmd, env=env,
                                    runas=runas, logerr=logerr, level=level)
+
             if ret['rc'] != 0:
                 self.logger.error(ret['err'])
             elif sudo_save_dest:
@@ -1557,8 +1575,13 @@ class DshUtils(object):
                            recursive=recursive, runas=runas)
             if ((uid is not None and uid != self.get_current_user()) or
                     gid is not None):
+                if dest == self.get_pbs_conf_file(targethost):
+                    uid = pwd.getpwnam('root')[2]
+                    gid = pwd.getpwnam('root')[3]
                 self.chown(targethost, path=dest, uid=uid, gid=gid, sudo=True,
-                           recursive=False)'''
+                           recursive=False)
+
+        return ret'''
 
     def run_copy(self, hosts=None, srchost=None, src=None, dest=None,
                  sudo=False, uid=None, gid=None, mode=None, env=None,
@@ -1610,8 +1633,6 @@ class DshUtils(object):
 
         if hosts is None:
             hosts = socket.gethostname()
-        #print("HOSTS inside run_copy-------------------------")
-        #print(hosts)
 
         if isinstance(hosts, str):
             hosts = hosts.split(',')
@@ -1667,30 +1688,50 @@ class DshUtils(object):
             # remote.
             if srchost:
                 srchost = socket.getfqdn(srchost)
+            else:
+                srchost = socket.gethostname()
+            src_platform = self.get_platform(hostname=srchost)
             if ((not islocal) or (srchost)):
                 copy_cmd = copy.deepcopy(self.copy_cmd)
                 targethost = socket.getfqdn(targethost)
                 if (srchost == targethost):
-                    cmd += [self.which(targethost, 'cp', level=level)]
-                    if preserve_permission:
-                        cmd += ['-p']
-                    if recursive:
-                        cmd += ['-r']
+                    if src_platform == "win32":
+                        cmd += [self.which(srchost, host_platform=src_platform, exe='xcopy', level=level)]
+                        if preserve_permission:
+                            cmd += ['/K /O /X ']
+                        if recursive:
+                            cmd += ['/E ']
+                    else:
+                        cmd += [self.which(targethost, host_platform=src_platform, exe='cp', level=level)]
+                        if preserve_permission:
+                            cmd += ['-p']
+                        if recursive:
+                            cmd += ['-r']
                     cmd += [src]
                     cmd += [dest]
                 else:
                     if not preserve_permission:
                         copy_cmd.remove('-p')
-                    if copy_cmd[0][0] != '/':
-                        copy_cmd[0] = self.which(targethost, copy_cmd[0],
+                    if src_platform == "win32":
+                        if copy_cmd[0][0] != '/':
+                            copy_cmd[0] = self.which(hostname=srchost, host_platform="win32", exe=copy_cmd[0],
                                                  level=level)
-                    cmd += copy_cmd
-                    if recursive:
-                        cmd += ['-r']
-                    if runas and runas.port:
-                        cmd += ['-P', runas.port]
-                    if srchost:
-                        src = srchost + ':' + src
+                        cmd += copy_cmd
+                        if recursive:
+                            cmd += ['/E']
+                    else:
+                        if copy_cmd[0][0] != '/':
+                            copy_cmd[0] = self.which(hostname=srchost, host_platform="linux", exe=copy_cmd[0],
+                                                 level=level)
+                        cmd += copy_cmd
+                        if recursive:
+                            cmd += ['-r']
+                    
+                    #if runas and runas.port:
+                    #    cmd += ['-P', runas.port]
+                    # Why do we need to add srchost before the src path ?
+                    #if srchost:
+                    #    src = srchost + ':' + src
                     cmd += [src]
                     if islocal:
                         cmd += [dest]
@@ -1700,10 +1741,12 @@ class DshUtils(object):
                         else:
                             cmd += [targethost + ':' + dest]
             else:
-                if localhost_platform == "win32":
-                    cmd += ['xcopy']
+                if src_platform == "win32":
+                    cmd += [self.which(targethost, host_platform=src_platform, exe='xcopy', level=level)]
+                    if preserve_permission:
+                        cmd += ['/K /O /X ']
                     if recursive:
-                        cmd += ['/s /e']
+                        cmd += ['/E']
                 else:
                     cmd += [self.which(targethost, exe='cp', level=level)]
                     if preserve_permission:
@@ -1725,11 +1768,13 @@ class DshUtils(object):
 
             if ret['rc'] != 0:
                 self.logger.error(ret['err'])
-            elif sudo_save_dest:
-                #print("------sudo_save_dest------%s" %sudo_save_dest)
-                cmd = [self.which(targethost, exe='cp', level=level)]
+            elif sudo_save_dest:                
+                dest_platform = self._h2p[targethost]
+                if dest_platform == "win32":
+                    cmd = [self.which(targethost, host_platform=dest_platform, exe='xcopy', level=level)]
+                else:
+                    cmd = [self.which(targethost, exe='cp', level=level)]
                 cmd += [dest, sudo_save_dest]
-                print(cmd)
                 ret = self.run_cmd(targethost, cmd=cmd, sudo=True, level=level)
                 self.rm(targethost, path=dest, level=level)
                 dest = sudo_save_dest
@@ -1927,8 +1972,12 @@ class DshUtils(object):
         else:
             # Constraints on the build system prevent running commands as
             # a privileged user through python, fall back to ls
+            '''platform = self.get_platform(hostname)
+            if platform == "win32":
+                cmd = ['dir', path]
+            else:'''
             cmd = ['ls', '-l', path]
-            ret = self.run_cmd(hostname, cmd=cmd, sudo=sudo, runas=runas,
+            ret = self.run_cmd(hostname, cmd=cmd, host_platform=platform, sudo=sudo, runas=runas,
                                logerr=False, level=level)
             if ret['rc'] != 0:
                 return False
@@ -1962,7 +2011,7 @@ class DshUtils(object):
             py_cmd = 'import os; print(os.path.getmtime(\'%s\'))' % (path)
             if not self.is_localhost(hostname):
                 py_cmd = '\"' + py_cmd + '\"'
-            pyexec = self.which(hostname, 'python3', level=logging.DEBUG2)
+            pyexec = self.which(hostname, exe='python3', level=logging.DEBUG2)
             cmd = [pyexec, '-c', py_cmd]
             ret = self.run_cmd(hostname, cmd=cmd, sudo=sudo, runas=runas,
                                logerr=False, level=level)
@@ -2100,7 +2149,7 @@ class DshUtils(object):
                 _u = str(uid)
         if _u == '':
             return False
-        cmd = [self.which(hostname, 'chown', level=level)]
+        cmd = [self.which(hostname, exe='chown', level=level)]
         if recursive:
             cmd += ['-R']
         cmd += [_u, path]
@@ -2431,12 +2480,17 @@ class DshUtils(object):
         if (path is None) or (len(path) == 0):
             return True
 
+        if hostname in list(self._h2p.keys()):
+            platform = self._h2p[hostname]
+
         if platform == "win32":
             cmd = ['del']
-            '''if recursive:
+            if recursive:
                 cmd += ['/S']
             if force:
-                cmd += ['/F']'''
+                cmd += ['/F']
+            # Adding quotes to make windows path with special characters work
+            path = '"' + path + '"'
             cmd += [path]
             ret = self.run_cmd(hostname, cmd=cmd, sudo=sudo,
                             logerr=logerr, runas=runas, cwd=cwd, level=level)
@@ -2554,7 +2608,8 @@ class DshUtils(object):
             rv = self.run_cmd(hostname, cmd=cmd, sudo=sudo,
                               runas=runas, logerr=logerr, level=level)
         else:
-            cmd = ['powershell.exe', 'type', filename]
+            filename = '"' + filename + '"'
+            cmd = ['type', filename]
             rv = self.run_cmd(hostname, cmd=cmd, host_platform="win32")
         return rv
 
@@ -2800,12 +2855,14 @@ class DshUtils(object):
             local_platform = self.get_platform(local_host)
             if remote_platform != local_platform:
                 if remote_platform == "win32":
-                    remote_tmpfile = "C:\\Users\\pbsadmin\\AppData\\Local\\Temp\\"
+                    remote_tmpfile = "C:\\Users\\saksham\\AppData\\Local\\Temp\\"
                 else:
                     remote_tmpfile = "/tmp/"
                 remote_tmpfile += os.path.basename(tmpfile)
             else:
                 remote_tmpfile = tmpfile
+            print("----------temp file------------")
+            print(remote_tmpfile)
             if asuser is not None:
                 # by default mkstemp creates file with 0600 permission
                 # to create file as different user first change the file
@@ -2816,12 +2873,12 @@ class DshUtils(object):
                 # as different user
                 print("hostname ------------------ %s"%hostname)
                 print("remote_tempfile ------------------------------ %s"%remote_tmpfile)
-                self.run_copy(hostname, tmpfile, remote_tmpfile, runas=asuser,
+                self.run_copy(hostname, src=tmpfile, dest=remote_tmpfile, runas=asuser,
                               preserve_permission=False, level=level)
             else:
                 # copy temp file created on localhost to remote as current user
-                self.run_copy(hostname, tmpfile, remote_tmpfile,
-                              preserve_permission=False, level=level, localhost=local_host)
+                self.run_copy(hostname, src=tmpfile, dest=remote_tmpfile,
+                              preserve_permission=False, level=level)
                 # remove local temp file
                 os.unlink(tmpfile)
         if asuser is not None:
@@ -2839,11 +2896,12 @@ class DshUtils(object):
             #print("hostname ------------------------------- %s"%hostname)
             remote_platform = self.get_platform(hostname)
             if remote_platform == "win32":
-                remote_tmpfile2 = "C:\\Users\\pbsadmin\\AppData\\Local\\Temp\\"
+                remote_tmpfile2 = "C:\\Users\\saksham\\AppData\\Local\\Temp\\"
             else:
                 remote_tmpfile2 = "/tmp/"
             remote_tmpfile2 += os.path.basename(tmpfile2)
-            self.run_copy(hostname, tmpfile, remote_tmpfile2, runas=asuser,
+            print("----------remote_tempfile2 ------------------------------ %s"%remote_tmpfile2)
+            self.run_copy(hostname, src=tmpfile, dest=remote_tmpfile2, runas=asuser,
                           preserve_permission=False, level=level)
             # remove original temp file
             #os.unlink(tmpfile)

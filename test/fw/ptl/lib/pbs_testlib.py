@@ -3947,7 +3947,6 @@ class PBSService(PBSObject):
                     #filename = os.path.join(logdir, day)
                     if 'win' in platform:
                         filename = logdir+"\\"+day
-                        filename = "\'"+filename+"\'"
                     else:
                         filename = logdir+"/"+day
                     print("filename -------------------------------------------------- %s"%filename)
@@ -6451,7 +6450,7 @@ class Server(PBSService):
             pcmd = [os.path.join(self.client_conf['PBS_EXEC'], 'bin',
                                  'pbs_rdel')]
             if not self.default_client_pbs_conf:
-                conf_file = self.client_pbs_conf_file[1:-1]
+                conf_file = self.client_pbs_conf_file
                 pcmd = ['set','PBS_CONF_FILE=' + conf_file, '&&'] + pcmd
                 as_script = True
             elif not self._is_local:
@@ -6616,7 +6615,7 @@ class Server(PBSService):
             #conf_path = 'r\"'+self.client_pbs_conf_file[1:-1]+'\"'
             #conf_path = "\"+self.client_pbs_conf_file+\""
             if not self.default_client_pbs_conf:
-                conf_file = self.client_pbs_conf_file[1:-1]
+                conf_file = self.client_pbs_conf_file
                 pcmd = ['set','PBS_CONF_FILE=' + conf_file, '&&'] + pcmd
                 as_script = True
             else:
@@ -6992,7 +6991,7 @@ class Server(PBSService):
             if jobid is not None:
                 pcmd += jobid
             if not self.default_client_pbs_conf:
-                conf_file = self.client_pbs_conf_file[1:-1]
+                conf_file = self.client_pbs_conf_file
                 pcmd = ['set','PBS_CONF_FILE=' + conf_file, '&&'] + pcmd
                 as_script = True
             else:
@@ -7161,7 +7160,7 @@ class Server(PBSService):
             if jobid is not None:
                 pcmd += jobid
             if not self.default_client_pbs_conf:
-                conf_file = self.client_pbs_conf_file[1:-1]
+                conf_file = self.client_pbs_conf_file
                 pcmd = ['set','PBS_CONF_FILE=' + conf_file, '&&'] + pcmd
                 as_script = True
             else:
@@ -7232,7 +7231,7 @@ class Server(PBSService):
             if jobid is not None:
                 pcmd += jobid
             if not self.default_client_pbs_conf:
-                conf_file = self.client_pbs_conf_file[1:-1]
+                conf_file = self.client_pbs_conf_file
                 pcmd = ['set','PBS_CONF_FILE=' + conf_file, '&&'] + pcmd
                 as_script = True
             else:
@@ -7302,7 +7301,7 @@ class Server(PBSService):
             if jobid is not None:
                 pcmd += jobid
             if not self.default_client_pbs_conf:
-                conf_file = self.client_pbs_conf_file[1:-1]
+                conf_file = self.client_pbs_conf_file
                 pcmd = ['set','PBS_CONF_FILE=' + conf_file, '&&'] + pcmd
                 as_script = True
             else:
@@ -7510,7 +7509,7 @@ class Server(PBSService):
             if jobid:
                 pcmd += jobid
             if not self.default_client_pbs_conf:
-                conf_file = self.client_pbs_conf_file[1:-1]
+                conf_file = self.client_pbs_conf_file
                 pcmd = ['set','PBS_CONF_FILE=' + conf_file, '&&'] + pcmd
                 as_script = True
             else:
@@ -7585,7 +7584,7 @@ class Server(PBSService):
             if jobid is not None:
                 pcmd += jobid
             if not self.default_client_pbs_conf:
-                conf_file = self.client_pbs_conf_file[1:-1]
+                conf_file = self.client_pbs_conf_file
                 pcmd = ['set','PBS_CONF_FILE=' + conf_file, '&&'] + pcmd
                 as_script = True
             else:
@@ -12499,11 +12498,16 @@ class Scheduler(PBSService):
             self.dedicated_time.append({'from': dtime_from, 'to': dtime_to})
         try:
             fn = self.du.create_temp_file()
+            print("------Temp file inside add_dedicated_time-----")
+            print(fn)
+            print("---------HOSTNAME inside add_dedicated_time")
+            print(self.hostname)
             with open(fn, "w") as fd:
                 for l in self.dedicated_time_as_str:
                     fd.write(l + '\n')
             ddfile = os.path.join(self.pbs_conf['PBS_HOME'], 'sched_priv',
                                   'dedicated_time')
+            print(ddfile)
             self.du.run_copy(self.hostname, src=fn, dest=ddfile, sudo=True,
                              preserve_permission=False)
             os.remove(fn)

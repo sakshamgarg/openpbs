@@ -949,7 +949,7 @@ class PBSTestSuite(unittest.TestCase):
         elif conf == "PBS_CORE_LIMIT":
             return "unlimited"
         elif conf == "PBS_SCP":
-            scppath = self.du.which(hostobj.hostname, "scp")
+            scppath = self.du.which(hostobj.hostname, exe="scp")
             if scppath != "scp":
                 return scppath
         elif conf == "PBS_LOG_HIGHRES_TIMESTAMP":
@@ -1019,7 +1019,7 @@ class PBSTestSuite(unittest.TestCase):
                 new_pbsconf["PBS_SERVER"] = primary_server.hostname
                 restart_comm = True
             if "PBS_SCP" not in new_pbsconf:
-                scppath = self.du.which(comm.hostname, "scp")
+                scppath = self.du.which(comm.hostname, exe="scp")
                 if scppath != "scp":
                     new_pbsconf["PBS_SCP"] = scppath
                     restart_comm = True
@@ -1106,7 +1106,7 @@ class PBSTestSuite(unittest.TestCase):
                 new_pbsconf["PBS_SERVER"] = primary_server.hostname
                 restart_mom = True
             if "PBS_SCP" not in new_pbsconf:
-                scppath = self.du.which(mom.hostname, "scp")
+                scppath = self.du.which(mom.hostname, exe="scp")
                 if scppath != "scp":
                     new_pbsconf["PBS_SCP"] = scppath
                     restart_mom = True
@@ -1216,7 +1216,7 @@ class PBSTestSuite(unittest.TestCase):
                 new_pbsconf["PBS_SERVER"] = server.shortname
                 restart_pbs = True
             if "PBS_SCP" not in new_pbsconf:
-                scppath = self.du.which(server.hostname, "scp")
+                scppath = self.du.which(server.hostname, exe="scp")
                 if scppath != "scp":
                     new_pbsconf["PBS_SCP"] = scppath
                     restart_pbs = True
