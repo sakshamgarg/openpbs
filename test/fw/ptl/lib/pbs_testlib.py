@@ -3868,6 +3868,47 @@ class PBSService(PBSObject):
         the service
         """
 
+    from itertools import islice
+    
+    def get_last_n_lines(self, file_name, N):
+        list_of_lines = []
+        # Open file for reading in binary mode
+        with open(file_name, 'rb') as read_obj:
+            read_obj.seek(0, os.SEEK_END)
+            # Create a buffer to keep the last read line
+            buffer = bytearray()
+            # Get the current position of pointer i.e eof
+            pointer_location = read_obj.tell()
+            # Loop till pointer reaches the top of the file
+            while pointer_location >= 0:
+                # Move the file pointer to the location pointed by pointer_location
+                read_obj.seek(pointer_location)
+                pointer_location = pointer_location -1
+                # read that byte / character
+                new_byte = read_obj.read(1)
+                # If the read byte is new line character then it means one line is read
+                if new_byte == b'\n':
+                    # Save the line in list of lines
+                    list_of_lines.append(buffer.decode()[::-1])
+                    # If the size of list reaches N, then return the reversed list
+                    if len(list_of_lines) == N:
+                        return list(reversed(list_of_lines))
+                    # Reinitialize the byte array to save next line
+                    buffer = bytearray()
+                else:
+                    # If last read character is not eol then add it in buffer
+                    buffer.extend(new_byte)
+     
+            # As file is read completely, if there is still data in buffer, then its first line.
+            if len(buffer) > 0:
+                list_of_lines.append(buffer.decode()[::-1])
+        return list(reversed(list_of_lines))
+    
+    def get_first_n_lines(self, file_name, N):
+        with open(file_name) as myfile:
+            head = list(islice(myfile, N))
+        return head
+
     def log_lines(self, logtype, id=None, n=50, tail=True, starttime=None,
                   endtime=None):
         """
@@ -3955,16 +3996,22 @@ class PBSService(PBSObject):
                             self.hostname, filename, sudo=sudo,
                             level=logging.DEBUG2)['out']
                     else:
-                        if tail:
-                            cmd = ['/usr/bin/tail']
+                        if 'win' in platform:
+                            if tail:
+                                day_lines = self.get_last_n_lines(filename, n)
+                            else:
+                                day_lines = self.get_first_n_lines(filename, n)
                         else:
-                            cmd = ['/usr/bin/head']
-
-                        cmd += ['-n']
-                        cmd += [str(n), filename]
-                        day_lines = self.du.run_cmd(
-                            self.hostname, cmd, sudo=sudo,
-                            level=logging.DEBUG2)['out']
+                            if tail:
+                                cmd = ['/usr/bin/tail']
+                            else:
+                                cmd = ['/usr/bin/head']
+    
+                            cmd += ['-n']
+                            cmd += [str(n), filename]
+                            day_lines = self.du.run_cmd(
+                                self.hostname, cmd, sudo=sudo,
+                                level=logging.DEBUG2)['out']
                     lines.extend(day_lines)
                     firstday_obj = firstday_obj + datetime.timedelta(days=1)
                     if n == 'ALL':
@@ -5835,7 +5882,10 @@ class Server(PBSService):
                     pcmd = pcmd
                 as_script = True
             elif obj_type == RESV and not self._is_local:
-                pcmd = ['PBS_SERVER=' + self.hostname] + pcmd
+                if "linux" in platform:
+                    pcmd = ['PBS_SERVER=' + self.hostname] + pcmd
+                elif "win" in platform:
+                    pcmd = pcmd
                 as_script = True
             else:
                 as_script = False

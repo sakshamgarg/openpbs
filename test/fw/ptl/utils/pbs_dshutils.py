@@ -1933,17 +1933,23 @@ class DshUtils(object):
             if "linux" in platform:
                 cmd = ['ls', '-l', dirname]
             else:
+                dirname = "\"" + dirname + "\""
                 cmd = ["dir", dirname]
             self.logger.log(level, "grep'ing for " + basename + " in " +
                             dirname)
-            ret = self.run_cmd(hostname, cmd=cmd, host_platform="win32")# sudo=sudo, runas=runas,
-                               #logerr=False, level=level)
+            ret = self.run_cmd(hostname, cmd=cmd, host_platform="win32", sudo=sudo, runas=runas,
+                               logerr=True, level=level)
             if ret['rc'] != 0:
                 return False
             else:
-                for l in ret['out']:
-                    if basename == l[-len(basename):] and l.startswith('d'):
-                        return True
+                if "win" in platform:
+                    for l in ret['out']:
+                        if basename == l[-len(basename):] and "<DIR>" in l:
+                            return True
+                else:
+                    for l in ret['out']:
+                        if basename == l[-len(basename):] and l.startswith('d'):
+                            return True
 
         return False
 
@@ -2640,7 +2646,12 @@ class DshUtils(object):
         if fileA is None or fileB is None:
             return 1
 
-        cmd = ['cmp', fileA, fileB]
+        platform = self.get_platform(hostname)
+        platform = platform.lower()
+        if "win" in platform:
+            cmd = ['comp', fileA, fileB]
+        else:
+            cmd = ['cmp', fileA, fileB]
         ret = self.run_cmd(hostname, cmd=cmd, sudo=sudo, runas=runas,
                            logerr=logerr)
         return ret['rc']
