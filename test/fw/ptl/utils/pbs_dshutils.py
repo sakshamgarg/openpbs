@@ -54,6 +54,8 @@ from subprocess import PIPE, Popen
 
 from ptl.utils.pbs_testusers import PBS_ALL_USERS, PbsUser
 
+from ptl.utils.platform.pbs_platform import PlatformSwitch
+
 DFLT_RSYNC_CMD = ['rsync', '-e', 'ssh', '--progress', '--partial', '-ravz']
 DFLT_COPY_CMD = ['scp', '-p']
 DFLT_RSH_CMD = ['ssh']
@@ -133,6 +135,7 @@ class DshUtils(object):
     copy_cmd = DFLT_COPY_CMD
     tmpfilelist = []
     tmpdirlist = []
+    ps = PlatformSwitch()
 
     def __init__(self):
 
@@ -183,6 +186,7 @@ class DshUtils(object):
         For efficiency the value is cached and retrieved from the
         cache upon subsequent request
         """
+
         splatform = sys.platform
         found_already = False
         if hostname is None:
@@ -214,6 +218,7 @@ class DshUtils(object):
             else:
                 splatform = ret['out'][0]
         self._h2p[hostname] = splatform
+        self.ps._h2p = copy.deepcopy(self._h2p)
         return splatform
 
     def get_uname(self, hostname=None, pyexec=None):
@@ -375,14 +380,16 @@ class DshUtils(object):
         :type hostname: str or None
         :returns: Path to pbs conf file
         """
-        dflt_conf = '/etc/pbs.conf'
-        dflt_python = '/opt/pbs/python/bin/python'
-
+        #dflt_conf = '/etc/pbs.conf'
+        #dflt_python = '/opt/pbs/python/bin/python'
         if hostname is None:
             hostname = socket.gethostname()
 
         if hostname in self._h2c:
             return self._h2c[hostname]
+
+        dflt_conf = self.ps.get_dflt_pbs_conf(hostname)
+        dflt_python = self.ps.get_dflt_python(hostname)
 
         if self.is_localhost(hostname):
             if 'PBS_CONF_FILE' in os.environ:
@@ -505,14 +512,15 @@ class DshUtils(object):
         return pbs_conf['PBS_SERVER']
 
     def parse_pbs_environment(self, hostname=None,
-                              file='/var/spool/pbs/pbs_environment'):
+                              file=None):
         """
         Initialize pbs_conf dictionary by parsing pbs config file
         """
+        file = self.ps.get_environment_file(hostname)
         return self._parse_file(hostname, file)
 
     def set_pbs_environment(self, hostname=None,
-                            fin='/var/spool/pbs/pbs_environment', fout=None,
+                            fin=None, fout=None,
                             append=True, environ=None):
         """
         Set the PBS environment
@@ -529,6 +537,7 @@ class DshUtils(object):
                        defaults to true
         :type append: bool
         """
+        fin = self.ps.get_environment_file(hostname)
         if fout is None and fin is not None:
             fout = fin
         if environ is None:
@@ -551,6 +560,7 @@ class DshUtils(object):
         :param environ: The environment keys to unset
         :type environ: List or str or dict or None
         """
+        fin = self.ps.get_environment_file(hostname)
         if fout is None and fin is not None:
             fout = fin
         if environ is None:
@@ -865,7 +875,8 @@ class DshUtils(object):
                 self._tempdir[hostname] = ret['out'][0].strip()
             else:
                 # Optimistically fall back to /tmp.
-                self._tempdir[hostname] = '/tmp'
+                # self._tempdir[hostname] = '/tmp'
+                self._tempdir[hostname] = self.ps.get_default_tempdir(hostname)
         return self._tempdir[hostname]
 
     def run_cmd(self, hosts=None, cmd=None, sudo=False, stdin=None,
@@ -914,9 +925,9 @@ class DshUtils(object):
                   ``{'out':...,'err':...,'rc':...}``
         """
 
-        rshcmd = []
-        sudocmd = []
-        platform = self.get_platform()
+        # rshcmd = []
+        # sudocmd = []
+        # platform = self.get_platform()
         _runas_user = None
 
         if level is None:
@@ -951,8 +962,13 @@ class DshUtils(object):
             self.logger.error(err_msg)
             return {'out': '', 'err': err_msg, 'rc': 1}
 
-        ret = {'out': '', 'err': '', 'rc': 0}
+        #ret = {'out': '', 'err': '', 'rc': 0}
 
+        ret = self.ps.run_cmd(hosts, cmd, sudo, stdin,
+                              stdout, stderr, input, cwd, env,
+                              runas, logerr, as_script, wait_on_script,
+                              level, port, self, TimeOut(), _user, _runas_user)
+        '''
         for hostname in hosts:
             if (platform == "shasta") and _runas_user:
                 hostname = _runas_user.host if _runas_user.host else hostname
@@ -1075,6 +1091,7 @@ class DshUtils(object):
             else:
                 self.logger.debug('err: ' + str(ret['err']))
             self.logger.debug('rc: ' + str(ret['rc']))
+        '''
 
         return ret
 
@@ -1181,11 +1198,15 @@ class DshUtils(object):
                 copy_cmd = copy.deepcopy(self.copy_cmd)
                 targethost = socket.getfqdn(targethost)
                 if (srchost == targethost):
-                    cmd += [self.which(targethost, 'cp', level=level)]
+                    cmd += self.ps.get_local_copy_cmd(
+                        targethost, preserve_permission, recursive)
+                    cmd[0] = self.which(targethost, cmd[0], level=level)
+                    '''
                     if preserve_permission:
                         cmd += ['-p']
                     if recursive:
                         cmd += ['-r']
+                    '''
                     cmd += [src]
                     cmd += [dest]
                 else:
@@ -1210,11 +1231,16 @@ class DshUtils(object):
                         else:
                             cmd += [targethost + ':' + dest]
             else:
-                cmd += [self.which(targethost, 'cp', level=level)]
+                cmd += self.ps.get_local_copy_cmd(targethost,
+                                                  preserve_permission,
+                                                  recursive)
+                cmd[0] = self.which(targethost, cmd[0], level=level)
+                '''
                 if preserve_permission:
                     cmd += ['-p']
                 if recursive:
                     cmd += ['-r']
+                '''
                 cmd += [src]
                 cmd += [dest]
 
@@ -1231,7 +1257,8 @@ class DshUtils(object):
             if ret['rc'] != 0:
                 self.logger.error(ret['err'])
             elif sudo_save_dest:
-                cmd = [self.which(targethost, 'cp', level=level)]
+                cmd = self.ps.get_local_copy_cmd(targethost)
+                cmd[0] = self.which(targethost, cmd[0], level=level)
                 cmd += [dest, sudo_save_dest]
                 ret = self.run_cmd(targethost, cmd=cmd, sudo=True, level=level)
                 self.rm(targethost, path=dest, level=level)
@@ -1384,7 +1411,9 @@ class DshUtils(object):
             # a privileged user through python, fall back to ls
             dirname = os.path.dirname(path)
             basename = os.path.basename(path)
-            cmd = ['ls', '-l', dirname]
+            cmd = self.ps.list_file_dir_cmd(hostname)
+            cmd += [dirname]
+            #cmd = ['ls', '-l', dirname]
             self.logger.log(level, "grep'ing for " + basename + " in " +
                             dirname)
             ret = self.run_cmd(hostname, cmd=cmd, sudo=sudo, runas=runas,
@@ -1423,7 +1452,9 @@ class DshUtils(object):
         else:
             # Constraints on the build system prevent running commands as
             # a privileged user through python, fall back to ls
-            cmd = ['ls', '-l', path]
+            # cmd = ['ls', '-l', path]
+            cmd = self.ps.list_file_dir_cmd(hostname)
+            cmd += [path]
             ret = self.run_cmd(hostname, cmd=cmd, sudo=sudo, runas=runas,
                                logerr=False, level=level)
             if ret['rc'] != 0:
@@ -1498,7 +1529,9 @@ class DshUtils(object):
             except OSError:
                 return retvalerr
         else:
-            ret = self.run_cmd(hostname, cmd=['ls', path], sudo=sudo,
+            cmd = self.ps.list_file_dir_cmd(hostname)
+            cmd += [path]
+            ret = self.run_cmd(hostname, cmd=cmd, sudo=sudo,
                                runas=runas, logerr=False, level=level)
             if ret['rc'] == 0:
                 files = ret['out']
@@ -1683,7 +1716,7 @@ class DshUtils(object):
             if exe in self._h2which[hostname]:
                 return self._h2which[hostname][exe]
 
-        sudo_wrappers_dir = '/opt/tools/wrappers'
+        sudo_wrappers_dir = self.ps.get_wrappers_dir(hostname)
         _exe = os.path.join(sudo_wrappers_dir, exe)
         if os.path.isfile(_exe) and os.access(_exe, os.X_OK):
             if hostname not in list(self._h2which.keys()):
@@ -1698,7 +1731,8 @@ class DshUtils(object):
             pbs_conf = self.parse_pbs_config(hostname)
             py_path = os.path.join(pbs_conf['PBS_EXEC'], 'python',
                                    'bin', 'python')
-            cmd = ['ls', '-1', py_path]
+            cmd = self.ps.list_file_dir_cmd(hostname)
+            cmd += [py_path]
             ret = self.run_cmd(hostname, cmd, logerr=False)
             if ret['rc'] == 0:
                 if hostname not in self._h2which.keys():
@@ -1707,7 +1741,8 @@ class DshUtils(object):
                     self._h2which[hostname].setdefault(exe, py_path)
                 return py_path
 
-        cmd = ['which', exe]
+        cmd = [self.ps.get_executable_path_cmd(hostname)]
+        cmd += [exe]
         ret = self.run_cmd(hostname, cmd=cmd, logerr=False,
                            level=level)
         if ((ret['rc'] == 0) and (len(ret['out']) == 1) and
@@ -1759,15 +1794,10 @@ class DshUtils(object):
         if (path is None) or (len(path) == 0):
             return True
 
-        cmd = [self.which(hostname, 'rm', level=level)]
-        if recursive and force:
-            cmd += ['-rf']
-        else:
-            if recursive:
-                cmd += ['-r']
-            if force:
-                cmd += ['-f']
+        cmd = self.ps.get_delete_cmd(hostname, recursive, force)
+        cmd[0] = self.which(hostname, cmd[0], level=level)
 
+        # Can be put in platform specific code
         if isinstance(path, list):
             for p in path:
                 if p == '/':
@@ -1787,6 +1817,8 @@ class DshUtils(object):
                            as_script=as_script)
         if ret['rc'] != 0:
             return False
+        if path in self.tmpfilelist:
+            self.tmpfilelist.remove(path)
         return True
 
     def mkdir(self, hostname=None, path=None, mode=None, sudo=False,
@@ -1865,11 +1897,9 @@ class DshUtils(object):
         :type logerr: boolean
         :returns: output of run_cmd
         """
-        cmd = [self.which(hostname, 'cat', level=level)]
-        if option:
-            cmd += [option, filename]
-        else:
-            cmd.append(filename)
+        cmd = self.ps.get_cat_cmd(hostname, option)
+        cmd[0] = self.which(hostname, cmd[0], level=level)
+        cmd.append(filename)
         return self.run_cmd(hostname, cmd=cmd, sudo=sudo,
                             runas=runas, logerr=logerr, level=level)
 
@@ -1900,7 +1930,8 @@ class DshUtils(object):
         if fileA is None or fileB is None:
             return 1
 
-        cmd = ['cmp', fileA, fileB]
+        cmd = [self.ps.get_compare_cmd(hostname)]
+        cmd += [fileA, fileB]
         ret = self.run_cmd(hostname, cmd=cmd, sudo=sudo, runas=runas,
                            logerr=logerr)
         return ret['rc']

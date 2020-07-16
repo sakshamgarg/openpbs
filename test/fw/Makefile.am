@@ -66,6 +66,10 @@ ptlpkg_pylib_pluginsdir = $(ptlpkg_pylib_utilsdir)/plugins
 
 dist_ptlpkg_pylib_plugins_PYTHON = $(wildcard $(srcdir)/ptl/utils/plugins/*.py)
 
+ptlpkg_pylib_platformdir = $(ptlpkg_pylib_utilsdir)/platform
+
+dist_ptlpkg_pylib_platform_PYTHON = $(wildcard $(srcdir)/ptl/utils/platform/*.py)
+
 sysprofiledir = /etc/profile.d
 
 dist_sysprofile_DATA = \
