@@ -258,3 +258,6 @@ class PBSPlatform(object):
 
     def get_compare_cmd(self, hostname=None):
         return 'cmp'
+
+    def get_pbs_mom_option(self):
+        return None

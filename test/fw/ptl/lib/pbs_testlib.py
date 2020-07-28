@@ -67,6 +67,7 @@ from ptl.utils.pbs_cliutils import CliUtils
 from ptl.utils.pbs_dshutils import DshUtils, PtlUtilError
 from ptl.utils.pbs_procutils import ProcUtils
 from ptl.utils.pbs_testusers import ROOT_USER, TEST_USER, PbsUser
+from ptl.utils.platform.pbs_platform import PlatformSwitch
 
 try:
     import psycopg2
@@ -261,6 +262,7 @@ class PtlConfig(object):
             'PTL_ATTEMPT_INTERVAL': PBSObject.set_attempt_interval,
             'PTL_UPDATE_ATTRIBUTES': PBSObject.set_update_attributes
         }
+        # Need to add default path for windows
         if conf is None:
             conf = os.environ.get('PTL_CONF_FILE', '/etc/ptl.conf')
         try:
@@ -3437,6 +3439,7 @@ class PBSService(PBSObject):
     """
     du = DshUtils()
     pu = ProcUtils()
+    ps = PlatformSwitch()
 
     def __init__(self, name=None, attrs=None, defaults=None, pbsconf_file=None,
                  snapmap=None, snap=None):
@@ -3498,6 +3501,7 @@ class PBSService(PBSObject):
         else:
             self.pbs_conf_file = pbsconf_file
 
+        # Do we need to change this ?
         if self.pbs_conf_file == '/etc/pbs.conf':
             self.default_pbs_conf = True
         elif (('PBS_CONF_FILE' not in os.environ) or
@@ -3686,6 +3690,7 @@ class PBSService(PBSObject):
         if inst is not None:
             pid = self._get_pid(inst)
 
+        # need to change here while adding Bhagat's code
         if procname is not None:
             pi = self.pu.get_proc_info(self.hostname, procname)
             if pi is not None and pi.values() and list(pi.values())[0]:
@@ -3705,6 +3710,7 @@ class PBSService(PBSObject):
         instance name or None.
         """
         cmd = self._instance_to_cmd(inst)
+        # might need to change here while adding Bhagat's code
         self.pu.get_proc_info(self.hostname, ".*" + cmd + ".*",
                               regexp=True)
         _procs = self.pu.processes.values()
@@ -3838,6 +3844,7 @@ class PBSService(PBSObject):
         return ret_msg
 
     def _stop(self, sig='-TERM', inst=None):
+        # need to change here while adding Bhagat's code
         if inst is None:
             return True
         self._signal(sig, inst)
@@ -3937,6 +3944,7 @@ class PBSService(PBSObject):
                             self.hostname, filename, sudo=sudo,
                             level=logging.DEBUG2)['out']
                     else:
+                        # Need to implement head and tail for windows
                         if tail:
                             cmd = ['/usr/bin/tail']
                         else:
@@ -4234,6 +4242,8 @@ class PBSService(PBSObject):
                         for, one of server, scheduler, mom or
                         if None, load all objects in infile
         """
+        # Do we need to add a check for remote files ?
+        # May not be needed
         if os.path.isfile(infile):
             conf = {}
             sconf = {}
@@ -4735,6 +4745,7 @@ class Server(PBSService):
         self.client_conf = self.du.parse_pbs_config(
             self.client, file=self.client_pbs_conf_file)
 
+        # what does client pbs conf means here ?
         if self.client_pbs_conf_file == '/etc/pbs.conf':
             self.default_client_pbs_conf = True
         elif (('PBS_CONF_FILE' not in os.environ) or
@@ -6077,6 +6088,7 @@ class Server(PBSService):
         c = None
         # 1- Submission using the command line tools
         runcmd = []
+        # Add this to set_env function in PlatformSwitch
         if env:
             runcmd += ['#!/bin/bash\n']
             for k, v in env.items():
@@ -6110,6 +6122,7 @@ class Server(PBSService):
                     # when setting PBS_TZID we standardize on running the cmd
                     # as a script instead of customizing for each OS flavor
                     _tz = obj.custom_attrs[ATTR_resv_timezone]
+                    # call set_env function in PlatformSwitch
                     runcmd = ['PBS_TZID=' + _tz] + runcmd
                     as_script = True
                     if ATTR_resv_rrule in obj.custom_attrs:
@@ -6176,6 +6189,7 @@ class Server(PBSService):
                 return ijid
 
             if not self.default_client_pbs_conf:
+                # call set_env function in PlatformSwitch
                 runcmd = [
                     'PBS_CONF_FILE=' + self.client_pbs_conf_file] + runcmd
                 as_script = True
@@ -6346,9 +6360,11 @@ class Server(PBSService):
                 if attr_W != PTL_NOARG:
                     pcmd += [attr_W]
             if not self.default_client_pbs_conf:
+                # call set_env function in PlatformSwitch
                 pcmd = ['PBS_CONF_FILE=' + self.client_pbs_conf_file] + pcmd
                 as_script = True
             elif not self._is_local:
+                # call set_env function in PlatformSwitch
                 pcmd = ['PBS_SERVER=' + self.hostname] + pcmd
                 as_script = True
             else:
@@ -6433,9 +6449,11 @@ class Server(PBSService):
             pcmd = [os.path.join(self.client_conf['PBS_EXEC'], 'bin',
                                  'pbs_rdel')]
             if not self.default_client_pbs_conf:
+                # Add this to set_env function in PlatformSwitch
                 pcmd = ['PBS_CONF_FILE=' + self.client_pbs_conf_file] + pcmd
                 as_script = True
             elif not self._is_local:
+                # Add this to set_env function in PlatformSwitch
                 pcmd = ['PBS_SERVER=' + self.hostname] + pcmd
                 as_script = True
             else:
@@ -6593,6 +6611,7 @@ class Server(PBSService):
 
             pcmd += cmd
             if not self.default_client_pbs_conf:
+                # Add this to set_env function in PlatformSwitch
                 pcmd = ['PBS_CONF_FILE=' + self.client_pbs_conf_file] + pcmd
                 as_script = True
             else:
@@ -6812,6 +6831,7 @@ class Server(PBSService):
                     '-c', execcmd]
 
             if as_script:
+                # Add this to set_env function in PlatformSwitch
                 pcmd = ['PBS_CONF_FILE=' + self.client_pbs_conf_file] + pcmd
 
             ret = self.du.run_cmd(self.hostname, pcmd, sudo=sudo, runas=runas,
@@ -6982,6 +7002,7 @@ class Server(PBSService):
             if jobid is not None:
                 pcmd += jobid
             if not self.default_client_pbs_conf:
+                # Add this to set_env function in PlatformSwitch
                 pcmd = ['PBS_CONF_FILE=' + self.client_pbs_conf_file] + pcmd
                 as_script = True
             else:
@@ -7073,6 +7094,7 @@ class Server(PBSService):
             if jobid is not None:
                 pcmd += jobid
             if not self.default_client_pbs_conf:
+                # Add this to set_env function in PlatformSwitch
                 pcmd = ['PBS_CONF_FILE=' + self.client_pbs_conf_file] + pcmd
                 as_script = True
             else:
@@ -7150,6 +7172,7 @@ class Server(PBSService):
             if jobid is not None:
                 pcmd += jobid
             if not self.default_client_pbs_conf:
+                # Add this to set_env function in PlatformSwitch
                 pcmd = ['PBS_CONF_FILE=' + self.client_pbs_conf_file] + pcmd
                 as_script = True
             else:
@@ -7220,6 +7243,7 @@ class Server(PBSService):
             if jobid is not None:
                 pcmd += jobid
             if not self.default_client_pbs_conf:
+                # Add this to set_env function in PlatformSwitch
                 pcmd = ['PBS_CONF_FILE=' + self.client_pbs_conf_file] + pcmd
                 as_script = True
             else:
@@ -7289,6 +7313,7 @@ class Server(PBSService):
             if jobid is not None:
                 pcmd += jobid
             if not self.default_client_pbs_conf:
+                # Add this to set_env function in PlatformSwitch
                 pcmd = ['PBS_CONF_FILE=' + self.client_pbs_conf_file] + pcmd
                 as_script = True
             else:
@@ -7353,6 +7378,7 @@ class Server(PBSService):
             if jobid is not None:
                 pcmd += jobid
             if not self.default_client_pbs_conf:
+                # Add this to set_env function in PlatformSwitch
                 pcmd = ['PBS_CONF_FILE=' + self.client_pbs_conf_file] + pcmd
                 as_script = True
             else:
@@ -7419,6 +7445,7 @@ class Server(PBSService):
             if jobid2 is not None:
                 pcmd += [jobid2]
             if not self.default_client_pbs_conf:
+                # Add this to set_env function in PlatformSwitch
                 pcmd = ['PBS_CONF_FILE=' + self.client_pbs_conf_file] + pcmd
                 as_script = True
             else:
@@ -7496,6 +7523,7 @@ class Server(PBSService):
             if jobid:
                 pcmd += jobid
             if not self.default_client_pbs_conf:
+                # Add this to set_env function in PlatformSwitch
                 pcmd = ['PBS_CONF_FILE=' + self.client_pbs_conf_file] + pcmd
                 as_script = True
             else:
@@ -7570,6 +7598,7 @@ class Server(PBSService):
             if jobid is not None:
                 pcmd += jobid
             if not self.default_client_pbs_conf:
+                # Add this to set_env function in PlatformSwitch
                 pcmd = ['PBS_CONF_FILE=' + self.client_pbs_conf_file] + pcmd
                 as_script = True
             else:
@@ -7743,6 +7772,7 @@ class Server(PBSService):
             if queue is not None:
                 pcmd += queue
             if not self.default_client_pbs_conf:
+                # Add this to set_env function in PlatformSwitch
                 pcmd = ['PBS_CONF_FILE=' + self.client_pbs_conf_file] + pcmd
                 as_script = True
             else:
@@ -7790,6 +7820,7 @@ class Server(PBSService):
             if queue is not None:
                 pcmd += queue
             if not self.default_client_pbs_conf:
+                # Add this to set_env function in PlatformSwitch
                 pcmd = ['PBS_CONF_FILE=' + self.client_pbs_conf_file] + pcmd
                 as_script = True
             else:
@@ -7837,6 +7868,7 @@ class Server(PBSService):
             if queue is not None:
                 pcmd += queue
             if not self.default_client_pbs_conf:
+                # Add this to set_env function in PlatformSwitch
                 pcmd = ['PBS_CONF_FILE=' + self.client_pbs_conf_file] + pcmd
                 as_script = True
             else:
@@ -7883,6 +7915,7 @@ class Server(PBSService):
             if queue is not None:
                 pcmd += queue
             if not self.default_client_pbs_conf:
+                # Add this to set_env function in PlatformSwitch
                 pcmd = ['PBS_CONF_FILE=' + self.client_pbs_conf_file] + pcmd
                 as_script = True
             else:
@@ -8247,6 +8280,7 @@ class Server(PBSService):
                                                   dflt_conf=_conf)
             pcmd += resvid
             if not self.default_client_pbs_conf:
+                # Add this to set_env function in PlatformSwitch
                 pcmd = ['PBS_CONF_FILE=' + self.client_pbs_conf_file] + pcmd
                 as_script = True
             else:
@@ -8637,6 +8671,7 @@ class Server(PBSService):
             for host, pids in host_pid_map.items():
                 chunks = [pids[i:i + 5000] for i in range(0, len(pids), 5000)]
                 for chunk in chunks:
+                    # Add Bhagat's functions: PlatformSwitch
                     self.du.run_cmd(host, ['kill', '-9'] + chunk,
                                     runas=ROOT_USER, logerr=False)
             if running_jobs:
@@ -9682,6 +9717,7 @@ class Server(PBSService):
             attrib = {}
 
         error = False
+        # Change hard coded paths in PlatformSwitch
         for hostname in momhosts:
             _pconf = self.du.parse_pbs_config(hostname)
             if 'PBS_HOME' in _pconf:
@@ -13838,6 +13874,9 @@ class MoM(PBSService):
         if not additive:
             self.delete_vnode_defs()
         cmd = [os.path.join(self.pbs_conf['PBS_EXEC'], 'sbin', 'pbs_mom')]
+        option = self.ps.get_pbs_mom_option(self.hostname)
+        if option is not None:
+            cmd += [str(option)]
         cmd += ['-s', 'insert', fname, fn]
         ret = self.du.run_cmd(self.hostname, cmd, sudo=True, logerr=False,
                               level=logging.INFOCLI)
@@ -13855,6 +13894,9 @@ class MoM(PBSService):
         Check for vnode definition(s)
         """
         cmd = [os.path.join(self.pbs_conf['PBS_EXEC'], 'sbin', 'pbs_mom')]
+        option = self.ps.get_pbs_mom_option(self.hostname)
+        if option is not None:
+            cmd += [str(option)]
         cmd += ['-s', 'list']
         ret = self.du.run_cmd(self.hostname, cmd, sudo=True, logerr=False,
                               level=logging.INFOCLI)
@@ -13877,6 +13919,9 @@ class MoM(PBSService):
         :returns: True if delete succeed otherwise False
         """
         cmd = [os.path.join(self.pbs_conf['PBS_EXEC'], 'sbin', 'pbs_mom')]
+        option = self.ps.get_pbs_mom_option(self.hostname)
+        if option is not None:
+            cmd += [str(option)]
         cmd += ['-s', 'list']
         ret = self.du.run_cmd(self.hostname, cmd, sudo=True, logerr=False,
                               level=logging.INFOCLI)
@@ -13891,6 +13936,8 @@ class MoM(PBSService):
                         continue
                     cmd = [os.path.join(self.pbs_conf['PBS_EXEC'], 'sbin',
                                         'pbs_mom')]
+                    if option is not None:
+                        cmd += [str(option)]
                     cmd += ['-s', 'remove', vnodedef]
                     ret = self.du.run_cmd(self.hostname, cmd, sudo=True,
                                           logerr=False, level=logging.INFOCLI)
@@ -14373,7 +14420,12 @@ class Job(ResourceResv):
         :param duration: The duration, in seconds, to sleep
         :type duration: int
         """
-        self.set_execargs('/bin/sleep', duration)
+        if self.du is None:
+            self.du = DshUtils()
+        pbs_conf = self.du.parse_pbs_config(socket.gethostname())
+        sleep_cmd = os.path.join(pbs_conf['PBS_EXEC'],
+                                 'bin', 'pbs_sleep')
+        self.set_execargs(sleep_cmd, duration)
 
     def set_execargs(self, executable, arguments=None):
         """

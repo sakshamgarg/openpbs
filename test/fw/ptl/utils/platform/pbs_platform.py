@@ -238,3 +238,6 @@ class PlatformSwitch():
 
     def get_ps_cmd(self, hostname):
         return self.get_platform_object(hostname).get_ps_cmd(hostname)
+
+    def get_pbs_mom_option(self, hostname):
+        return self.get_platform_object(hostname).get_pbs_mom_option()
