@@ -236,8 +236,13 @@ class PlatformSwitch():
     def get_compare_cmd(self, hostname=None):
         return self.get_platform_object(hostname).get_compare_cmd(hostname)
 
-    def get_ps_cmd(self, hostname):
-        return self.get_platform_object(hostname).get_ps_cmd(hostname)
+    def get_process_command(self, hostname, name, pid, regexp):
+        return self.get_platform_object(hostname).get_process_command(name,
+                                                                      pid,
+                                                                      regexp)
+
+    def get_ps_cmd_attrs(self, hostname, ps_cmd):
+        return self.get_platform_object(hostname).get_ps_cmd_attrs(ps_cmd)
 
     def get_pbs_mom_option(self, hostname):
         return self.get_platform_object(hostname).get_pbs_mom_option()

@@ -259,5 +259,35 @@ class PBSPlatform(object):
     def get_compare_cmd(self, hostname=None):
         return 'cmp'
 
+    def get_process_command(self, name, pid, regexp):
+
+        ps_arg = '-C'
+        ps_cmd = ['ps', '-o', 'pid,rss,vsz,pcpu,pmem,size,cputime,command']
+
+        #print("Name, PID, regexp" + str(name) + str(pid) + str(regexp))
+        if name is not None:
+            if not regexp:
+                proc_cmd = (ps_cmd + [ps_arg, name])
+            else:
+                proc_cmd = ps_cmd + ['-e']
+        elif pid is not None:
+            proc_cmd = ps_cmd + ['-p', pid]
+        else:
+            return None
+        return proc_cmd
+
+    def get_ps_cmd_attrs(self, ps_cmd):
+        ps_attr = {}
+        ps_attr['p'] = ps_cmd[0]
+        ps_attr['rss'] = ps_cmd[1]
+        ps_attr['vsz'] = ps_cmd[2]
+        ps_attr['pcpu'] = ps_cmd[3]
+        ps_attr['pmem'] = ps_cmd[4]
+        ps_attr['size'] = ps_cmd[5]
+        ps_attr['cputime'] = ps_cmd[6]
+        ps_attr['command'] = " ".join(ps_cmd[7:])
+
+        return ps_attr
+
     def get_pbs_mom_option(self):
         return None

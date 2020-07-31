@@ -47,6 +47,7 @@ import socket
 import os
 import json
 from ptl.utils.pbs_dshutils import DshUtils
+from ptl.utils.platform.pbs_platform import PlatformSwitch
 
 
 class ProcUtils(object):
@@ -57,18 +58,19 @@ class ProcUtils(object):
 
     logger = logging.getLogger(__name__)
     du = DshUtils()
+    ps = PlatformSwitch()
     platform = sys.platform
 
     def __init__(self):
         self.processes = {}
         self.__h2ps = {}
 
-    def get_ps_cmd(self, hostname=None):
-        """
-        Get the ps command
+    def _init_processes(self):
+        self.processes = {}
 
-        :param hostname: hostname of the machine
-        :type hostname: str or None
+    def _get_proc_info(self, hostname=None, name=None, pid=None, regexp=False):
+        """
+        Helper function to ``get_proc_info`` for Unix only system
         """
         if hostname is None:
             hostname = socket.gethostname()
@@ -76,37 +78,10 @@ class ProcUtils(object):
         if hostname in self.__h2ps:
             return self.__h2ps[hostname]
 
-        if not self.du.is_localhost(hostname):
-            platform = self.du.get_platform(hostname)
-        else:
-            platform = self.platform
+        process_cmd = self.ps.get_process_command(hostname, name, pid, regexp)
 
-        # set some platform-specific arguments to ps
-        ps_arg = '-C'
-        ps_cmd = ['ps', '-o', 'pid,rss,vsz,pcpu,pmem,size,cputime,command']
-        self.__h2ps[hostname] = (ps_cmd, ps_arg)
-
-        return (ps_cmd, ps_arg)
-
-    def _init_processes(self):
-        self.processes = {}
-
-    def _get_proc_info_unix(self, hostname=None, name=None,
-                            pid=None, regexp=False):
-        """
-        Helper function to ``get_proc_info`` for Unix only system
-        """
-        (ps_cmd, ps_arg) = self.get_ps_cmd(hostname)
-        if name is not None:
-            if not regexp:
-                cr = self.du.run_cmd(hostname, (ps_cmd + [ps_arg, name]),
-                                     level=logging.DEBUG2)
-            else:
-                cr = self.du.run_cmd(hostname, ps_cmd + ['-e'],
-                                     level=logging.DEBUG2)
-        elif pid is not None:
-            cr = self.du.run_cmd(hostname, ps_cmd + ['-p', pid],
-                                 level=logging.DEBUG2)
+        if process_cmd is not None:
+            cr = self.du.run_cmd(hostname, process_cmd, level=logging.DEBUG2)
         else:
             return
 
@@ -115,36 +90,30 @@ class ProcUtils(object):
                 _pi = None
                 try:
                     _s = proc.split()
-                    p = _s[0]
-                    rss = _s[1]
-                    vsz = _s[2]
-                    pcpu = _s[3]
-                    pmem = _s[4]
-                    size = _s[5]
-                    cputime = _s[6]
-                    command = " ".join(_s[7:])
+                    ps_attr = self.ps.get_ps_cmd_attrs(hostname, _s)
                 except BaseException:
                     continue
 
                 if ((pid is not None and p == str(pid)) or
                     (name is not None and (
-                        (regexp and re.search(name, command) is not None) or
-                        (not regexp and name in command)))):
-                    _pi = ProcInfo(name=command)
-                    _pi.pid = p
-                    _pi.rss = rss
-                    _pi.vsz = vsz
-                    _pi.pcpu = pcpu
-                    _pi.pmem = pmem
-                    _pi.size = size
-                    _pi.cputime = cputime
-                    _pi.command = command
+                        (regexp and re.search(name, ps_attr['command'])
+                            is not None) or
+                        (not regexp and name in ps_attr['command'])))):
+                    _pi = ProcInfo(name=ps_attr['command'])
+                    _pi.pid = ps_attr['p']
+                    _pi.rss = ps_attr['rss']
+                    _pi.vsz = ps_attr['vsz']
+                    _pi.pcpu = ps_attr['pcpu']
+                    _pi.pmem = ps_attr['pmem']
+                    _pi.size = ps_attr['size']
+                    _pi.cputime = ps_attr['cputime']
+                    _pi.command = ps_attr['command']
 
                 if _pi is not None:
-                    if command in self.processes:
-                        self.processes[command].append(_pi)
+                    if ps_attr['command'] in self.processes:
+                        self.processes['command'].append(_pi)
                     else:
-                        self.processes[command] = [_pi]
+                        self.processes['command'] = [_pi]
         return self.processes
 
     def get_proc_info(self, hostname=None, name=None, pid=None, regexp=False):
@@ -168,7 +137,7 @@ class ProcUtils(object):
         .. note:: If both, name and pid, are specified, name is used.
         """
         self._init_processes()
-        return self._get_proc_info_unix(hostname, name, pid, regexp)
+        return self._get_proc_info(hostname, name, pid, regexp)
 
     def get_proc_state(self, hostname=None, pid=None):
         """
