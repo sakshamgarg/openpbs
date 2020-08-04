@@ -259,21 +259,49 @@ class PBSPlatform(object):
     def get_compare_cmd(self, hostname=None):
         return 'cmp'
 
-    def get_process_command(self, name, pid, regexp):
+    def get_process_command(self, process_param):
 
         ps_arg = '-C'
-        ps_cmd = ['ps', '-o', 'pid,rss,vsz,pcpu,pmem,size,cputime,command']
+        ps_cmd = ['ps']
+        output_param = []
 
-        #print("Name, PID, regexp" + str(name) + str(pid) + str(regexp))
-        if name is not None:
-            if not regexp:
-                proc_cmd = (ps_cmd + [ps_arg, name])
+        if process_param['pid_output'] is not None:
+            output_param += ['pid']
+        if process_param['rss'] is not None:
+            output_param += ['rss']
+        if process_param['vsz'] is not None:
+            output_param += ['vsz']
+        if process_param['pcpu'] is not None:
+            output_param += ['pcpu']
+        if process_param['pmem'] is not None:
+            output_param += ['pmem']
+        if process_param['size'] is not None:
+            output_param += ['size']
+        if process_param['cputime'] is not None:
+            output_param += ['cputime']
+        if process_param['command'] is not None:
+            output_param += ['command']
+        if process_param['stat'] is not None:
+            output_param += ['stat']
+
+        output_param = [",".join(output_param)]
+        ps_cmd += ['-o']
+        ps_cmd += output_param
+
+        if process_param['name'] is not None:
+            if not process_param['regexp']:
+                proc_cmd = (ps_cmd + [ps_arg, process_param['name']])
             else:
                 proc_cmd = ps_cmd + ['-e']
-        elif pid is not None:
-            proc_cmd = ps_cmd + ['-p', pid]
+        elif process_param['pid'] is not None:
+            proc_cmd = ps_cmd + ['-p', process_param['pid']]
         else:
             return None
+
+        if process_param['ppid'] is not None:
+            proc_cmd += ['--ppid:%s' % process_param['ppid']]
+        if process_param['no-heading'] is not None:
+            proc_cmd += ['--no-heading']
         return proc_cmd
 
     def get_ps_cmd_attrs(self, ps_cmd):

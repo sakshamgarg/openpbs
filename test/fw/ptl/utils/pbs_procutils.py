@@ -64,9 +64,16 @@ class ProcUtils(object):
     def __init__(self):
         self.processes = {}
         self.__h2ps = {}
+        self.process_param = {}
 
     def _init_processes(self):
         self.processes = {}
+    
+    def _init_process_parameters(self):
+        param_list = ["pid_output", "rss", "vsz", "pcpu", "pmem", "size", "cputime",
+                      "command", "name", "regexp", "stat", "ppid", "pid",
+                      "no-heading"]
+        self.process_param = dict.fromkeys(param_list, None)
 
     def _get_proc_info(self, hostname=None, name=None, pid=None, regexp=False):
         """
@@ -78,7 +85,14 @@ class ProcUtils(object):
         if hostname in self.__h2ps:
             return self.__h2ps[hostname]
 
-        process_cmd = self.ps.get_process_command(hostname, name, pid, regexp)
+        if pid is None:
+            pid = True
+        self.process_param.update({'pid_output': True, 'rss': True, 'vsz': True,
+                                   'pcpu': True, 'pmem': True, 'size': True,
+                                   'cputime': True, 'command': True,
+                                   'pid': pid, 'name': name, 'regexp': regexp})
+
+        process_cmd = self.ps.get_process_command(hostname, self.process_param)
 
         if process_cmd is not None:
             cr = self.du.run_cmd(hostname, process_cmd, level=logging.DEBUG2)
@@ -94,7 +108,7 @@ class ProcUtils(object):
                 except BaseException:
                     continue
 
-                if ((pid is not None and p == str(pid)) or
+                if ((pid is not None and ps_attr['p'] == str(pid)) or
                     (name is not None and (
                         (regexp and re.search(name, ps_attr['command'])
                             is not None) or
@@ -137,6 +151,7 @@ class ProcUtils(object):
         .. note:: If both, name and pid, are specified, name is used.
         """
         self._init_processes()
+        self._init_process_parameters()
         return self._get_proc_info(hostname, name, pid, regexp)
 
     def get_proc_state(self, hostname=None, pid=None):
@@ -150,9 +165,12 @@ class ProcUtils(object):
         else:
             platform = sys.platform
 
+        self._init_process_parameters()
+        self.process_param.update({'pid': pid, 'stat': True,
+                                   'no-heading': True})
         try:
             if platform.startswith('linux') or platform.startswith('shasta'):
-                cmd = ['ps', '-o', 'stat', '-p', str(pid), '--no-heading']
+                cmd = self.ps.get_process_command(hostname=None, process_param=self.process_param, platform=platform)
                 rv = self.du.run_cmd(hostname, cmd, level=logging.DEBUG2)
                 return rv['out'][0][0]
         except BaseException:
@@ -181,7 +199,10 @@ class ProcUtils(object):
             childlist = []
 
             if platform.startswith('linux') or platform.startswith('shasta'):
-                cmd = ['ps', '-o', 'pid', '--ppid:%s' % ppid, '--no-heading']
+                self._init_process_parameters()
+                self.process_param.update({'pid_output': True, 'ppid': ppid,
+                                           'no-heading': True})
+                cmd = self.ps.get_process_command(hostname=None, process_param=self.process_param, platform=platform)
                 rv = self.du.run_cmd(hostname, cmd)
                 children = rv['out'][:-1]
             else:

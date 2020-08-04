@@ -50,9 +50,11 @@ class PlatformSwitch():
     _p2o = {}  # platform to object cache
     _h2p = {}
 
-    def get_platform_object(self, hostname):
-
-        plat = self.get_platform(hostname)
+    def get_platform_object(self, hostname=None, platform=None):
+        if platform is not None:
+            plat = platform
+        else:
+            plat = self.get_platform(hostname)
 
         # print("PLATFORM: "+str(plat))
         # print("HOSTNAME: "+str(hostname))
@@ -236,10 +238,8 @@ class PlatformSwitch():
     def get_compare_cmd(self, hostname=None):
         return self.get_platform_object(hostname).get_compare_cmd(hostname)
 
-    def get_process_command(self, hostname, name, pid, regexp):
-        return self.get_platform_object(hostname).get_process_command(name,
-                                                                      pid,
-                                                                      regexp)
+    def get_process_command(self, hostname, process_param, platform=None):
+        return self.get_platform_object(hostname, platform).get_process_command(process_param)
 
     def get_ps_cmd_attrs(self, hostname, ps_cmd):
         return self.get_platform_object(hostname).get_ps_cmd_attrs(ps_cmd)
