@@ -51,6 +51,7 @@ from subprocess import PIPE, Popen
 from ptl.lib.pbs_testlib import (EQ, JOB, NODE, SET, BatchUtils, ResourceResv,
                                  Server)
 from ptl.utils.pbs_dshutils import DshUtils
+from ptl.utils.platform.pbs_platform import PlatformSwitch
 
 """
 Analyze ``server``, ``scheduler``, ``MoM``, and ``accounting`` logs.
@@ -222,6 +223,7 @@ class PBSLogUtils(object):
 
     logger = logging.getLogger(__name__)
     du = DshUtils()
+    ps = PlatformSwitch()
 
     @classmethod
     def convert_date_time(cls, dt=None, fmt=None):
@@ -286,9 +288,10 @@ class PBSLogUtils(object):
         :returns: A file instance
         """
         try:
+            cat_cmd = self.ps.get_cat_cmd(hostname)
             if hostname is None or self.du.is_localhost(hostname):
                 if sudo:
-                    cmd = copy.copy(self.du.sudo_cmd) + ['cat', log]
+                    cmd = copy.copy(self.du.sudo_cmd) + cat_cmd + [log]
                     self.logger.info('running ' + " ".join(cmd))
                     p = Popen(cmd, stdout=PIPE)
                     f = p.stdout
@@ -298,7 +301,8 @@ class PBSLogUtils(object):
                 cmd = ['ssh', hostname]
                 if sudo:
                     cmd += self.du.sudo_cmd
-                cmd += ['cat', log]
+                cmd += cat_cmd
+                cmd += [log]
                 self.logger.debug('running ' + " ".join(cmd))
                 p = Popen(cmd, stdout=PIPE)
                 f = p.stdout
