@@ -219,8 +219,8 @@ class PlatformSwitch():
                             preserve_permission, recursive):
         return self.get_platform_object(hostname).get_remote_copy_cmd(hostname)
 
-    def list_file_dir_cmd(self, hostname=None):
-        return self.get_platform_object(hostname).list_file_dir_cmd(hostname)
+    def list_file_dir_cmd(self, hostname, long_format):
+        return self.get_platform_object(hostname).list_file_dir_cmd(long_format)
 
     def get_wrappers_dir(self, hostname=None):
         return self.get_platform_object(hostname).get_wrappers_dir(hostname)

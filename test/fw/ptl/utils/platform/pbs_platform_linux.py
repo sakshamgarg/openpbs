@@ -232,8 +232,10 @@ class PBSPlatform(object):
         else:
             cmd = copy_cmd
 
-    def list_file_dir_cmd(self, hostname=None):
-        cmd = ['ls', '-l']
+    def list_file_dir_cmd(self, long_format=False):
+        cmd = ['ls']
+        if long_format:
+            cmd += ['-l']
         return cmd
 
     def get_wrappers_dir(self, hostname=None):

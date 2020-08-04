@@ -1411,7 +1411,7 @@ class DshUtils(object):
             # a privileged user through python, fall back to ls
             dirname = os.path.dirname(path)
             basename = os.path.basename(path)
-            cmd = self.ps.list_file_dir_cmd(hostname)
+            cmd = self.ps.list_file_dir_cmd(hostname, long_format=True)
             cmd += [dirname]
             #cmd = ['ls', '-l', dirname]
             self.logger.log(level, "grep'ing for " + basename + " in " +
@@ -1453,7 +1453,7 @@ class DshUtils(object):
             # Constraints on the build system prevent running commands as
             # a privileged user through python, fall back to ls
             # cmd = ['ls', '-l', path]
-            cmd = self.ps.list_file_dir_cmd(hostname)
+            cmd = self.ps.list_file_dir_cmd(hostname, long_format=True)
             cmd += [path]
             ret = self.run_cmd(hostname, cmd=cmd, sudo=sudo, runas=runas,
                                logerr=False, level=level)
@@ -1529,7 +1529,7 @@ class DshUtils(object):
             except OSError:
                 return retvalerr
         else:
-            cmd = self.ps.list_file_dir_cmd(hostname)
+            cmd = self.ps.list_file_dir_cmd(hostname, long_format=False)
             cmd += [path]
             ret = self.run_cmd(hostname, cmd=cmd, sudo=sudo,
                                runas=runas, logerr=False, level=level)
@@ -1731,7 +1731,7 @@ class DshUtils(object):
             pbs_conf = self.parse_pbs_config(hostname)
             py_path = os.path.join(pbs_conf['PBS_EXEC'], 'python',
                                    'bin', 'python')
-            cmd = self.ps.list_file_dir_cmd(hostname)
+            cmd = self.ps.list_file_dir_cmd(hostname, long_format=True)
             cmd += [py_path]
             ret = self.run_cmd(hostname, cmd, logerr=False)
             if ret['rc'] == 0:
