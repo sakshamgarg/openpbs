@@ -68,7 +68,7 @@ class ProcUtils(object):
 
     def _init_processes(self):
         self.processes = {}
-    
+
     def _init_process_parameters(self):
         param_list = ["pid_output", "rss", "vsz", "pcpu", "pmem", "size", "cputime",
                       "command", "name", "regexp", "stat", "ppid", "pid",
@@ -125,9 +125,9 @@ class ProcUtils(object):
 
                 if _pi is not None:
                     if ps_attr['command'] in self.processes:
-                        self.processes['command'].append(_pi)
+                        self.processes[ps_attr['command']].append(_pi)
                     else:
-                        self.processes['command'] = [_pi]
+                        self.processes[ps_attr['command']] = [_pi]
         return self.processes
 
     def get_proc_info(self, hostname=None, name=None, pid=None, regexp=False):
