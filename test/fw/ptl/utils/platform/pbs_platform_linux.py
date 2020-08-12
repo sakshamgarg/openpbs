@@ -244,7 +244,7 @@ class PBSPlatform(object):
     def get_executable_path_cmd(self, hostname=None):
         return 'which'
 
-    def get_delete_cmd(self, hostname=None, recursive=False, force=False):
+    def get_delete_cmd(self, recursive=False, force=False):
         cmd = ['rm']
         if recursive:
             cmd += ['-r']

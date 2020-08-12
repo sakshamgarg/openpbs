@@ -1012,8 +1012,7 @@ class PTLTestRunner(Plugin):
                 du.rm(path=f, sudo=True, recursive=True, force=True,
                       level=logging.DEBUG)
         for f in du.tmpfilelist:
-            if os.path.exists(f):
-                du.rm(path=f, sudo=True, force=True, level=logging.DEBUG)
+            du.rm(path=f, sudo=True, force=True, level=logging.DEBUG)
         del du.tmpfilelist[:]
         tmpdir = tempfile.gettempdir()
         os.chdir(tmpdir)

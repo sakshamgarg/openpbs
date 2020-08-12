@@ -230,7 +230,7 @@ class PlatformSwitch():
             hostname).get_executable_path_cmd(hostname)
 
     def get_delete_cmd(self, hostname=None, recursive=False, force=False):
-        return self.get_platform_object(hostname).get_delete_cmd(hostname)
+        return self.get_platform_object(hostname).get_delete_cmd(recursive, force)
 
     def get_cat_cmd(self, hostname, option=None):
         return self.get_platform_object(hostname).get_cat_cmd(hostname, option)
