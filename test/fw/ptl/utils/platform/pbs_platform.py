@@ -244,5 +244,8 @@ class PlatformSwitch():
     def get_ps_cmd_attrs(self, hostname, ps_cmd):
         return self.get_platform_object(hostname).get_ps_cmd_attrs(ps_cmd)
 
+    def get_kill_cmd(self, hostname, signal, pid, force):
+        return self.get_platform_object(hostname).get_kill_cmd(signal, pid, force)
+
     def get_pbs_mom_option(self, hostname):
         return self.get_platform_object(hostname).get_pbs_mom_option()

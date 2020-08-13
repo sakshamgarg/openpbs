@@ -319,5 +319,16 @@ class PBSPlatform(object):
 
         return ps_attr
 
+    def get_kill_cmd(self, signal=None, pid=None, force=False):
+        cmd = ['kill']
+        if signal is not None:
+            cmd += [signal]
+        if pid is not None:
+            if signal == '-9':
+                cmd += pid
+            else:
+                cmd += [pid]
+        return cmd
+
     def get_pbs_mom_option(self):
         return None

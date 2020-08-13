@@ -3690,19 +3690,20 @@ class PBSService(PBSObject):
         if inst is not None:
             pid = self._get_pid(inst)
 
-        # need to change here while adding Bhagat's code
         if procname is not None:
             pi = self.pu.get_proc_info(self.hostname, procname)
             if pi is not None and pi.values() and list(pi.values())[0]:
                 for _p in list(pi.values())[0]:
-                    ret = self.du.run_cmd(self.hostname, ['kill', sig, _p.pid],
+                    kill_cmd = self.ps.get_kill_cmd(self.hostname, sig, _p.pid, force=True)
+                    ret = self.du.run_cmd(self.hostname, kill_cmd,
                                           sudo=True)
                 return ret
 
         if pid is None:
             return {'rc': 0, 'err': '', 'out': 'no pid to signal'}
 
-        return self.du.run_cmd(self.hostname, ['kill', sig, pid], sudo=True)
+        kill_cmd = self.ps.get_kill_cmd(self.hostname, sig, pid, force=True)
+        return self.du.run_cmd(self.hostname, kill_cmd, sudo=True)
 
     def _all_instance_pids(self, inst):
         """
@@ -3710,7 +3711,6 @@ class PBSService(PBSObject):
         instance name or None.
         """
         cmd = self._instance_to_cmd(inst)
-        # might need to change here while adding Bhagat's code
         self.pu.get_proc_info(self.hostname, ".*" + cmd + ".*",
                               regexp=True)
         _procs = self.pu.processes.values()
@@ -3844,7 +3844,6 @@ class PBSService(PBSObject):
         return ret_msg
 
     def _stop(self, sig='-TERM', inst=None):
-        # need to change here while adding Bhagat's code
         if inst is None:
             return True
         self._signal(sig, inst)
@@ -8671,8 +8670,8 @@ class Server(PBSService):
             for host, pids in host_pid_map.items():
                 chunks = [pids[i:i + 5000] for i in range(0, len(pids), 5000)]
                 for chunk in chunks:
-                    # Add Bhagat's functions: PlatformSwitch
-                    self.du.run_cmd(host, ['kill', '-9'] + chunk,
+                    kill_cmd = self.ps.get_kill_cmd(self.hostname, '-9', chunk, force=True)
+                    self.du.run_cmd(host, kill_cmd,
                                     runas=ROOT_USER, logerr=False)
             if running_jobs:
                 last_running_job = running_jobs[-1]
