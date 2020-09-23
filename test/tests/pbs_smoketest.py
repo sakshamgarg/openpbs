@@ -329,6 +329,7 @@ class SmokeTest(PBSTestSuite):
         jid = self.server.submit(j)
         self.server.expect(JOB, {'job_state': 'R'}, id=jid)
 
+    @runOnlyOnLinux
     def test_finished_jobs(self):
         """
         Test for finished jobs and resource used for jobs.
@@ -1373,6 +1374,7 @@ class SmokeTest(PBSTestSuite):
 
     @checkModule("pexpect")
     @skipOnShasta
+    @runOnlyOnLinux
     def test_interactive_job(self):
         """
         Submit an interactive job
