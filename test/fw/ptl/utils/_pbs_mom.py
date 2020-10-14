@@ -563,10 +563,10 @@ class MoM(PBSService):
 
         new_pbsconf = dict(vals_to_set)
         restart_mom = False
-        pbs_conf_val = self.du.parse_pbs_config(mom.hostname)
+        pbs_conf_val = self.du.parse_pbs_config(self.hostname)
         if not pbs_conf_val:
             raise ValueError("Could not parse pbs.conf on host %s" %
-                             (mom.hostname))
+                             (self.hostname))
 
         # to start with, set all keys in new_pbsconf with values from the
         # existing pbs.conf
@@ -579,7 +579,7 @@ class MoM(PBSService):
                 # Try to determine the default
                 val = self._get_dflt_pbsconfval(conf,
                                                 primary_server.hostname,
-                                                "mom", mom)
+                                                "mom", self)
                 if val is None:
                     self.logger.error("Couldn't revert %s in pbs.conf"
                                       " to its default value" %
@@ -604,7 +604,7 @@ class MoM(PBSService):
             new_pbsconf["PBS_SERVER"] = primary_server.hostname
             restart_mom = True
         if "PBS_SCP" not in new_pbsconf:
-            scppath = self.du.which(mom.hostname, "scp")
+            scppath = self.du.which(self.hostname, "scp")
             if scppath != "scp":
                 new_pbsconf["PBS_SCP"] = scppath
                 restart_mom = True
@@ -617,17 +617,17 @@ class MoM(PBSService):
         if len(pbs_conf_val) != len(new_pbsconf):
             restart_mom = True
         # Check if existing pbs.conf has correct ownership
-        dest = self.mom.get_pbs_conf_file(mom.hostname)
+        dest = self.du.get_pbs_conf_file(self.hostname)
         (cf_uid, cf_gid) = (os.stat(dest).st_uid, os.stat(dest).st_gid)
         if cf_uid != 0 or cf_gid > 10:
             restart_mom = True
 
         if restart_mom:
-            self.du.set_pbs_config(mom.hostname, confs=new_pbsconf,
+            self.du.set_pbs_config(self.hostname, confs=new_pbsconf,
                                    append=False)
-            mom.pbs_conf = new_pbsconf
-            mom.pi.initd(mom.hostname, "restart", daemon="mom")
-            if not mom.isUp():
+            self.pbs_conf = new_pbsconf
+            self.pi.initd(self.hostname, "restart", daemon="mom")
+            if not self.isUp():
                 self.fail("Mom is not up")
 
     def save_configuration(self, outfile=None, mode='w'):
