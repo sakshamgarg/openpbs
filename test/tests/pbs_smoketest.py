@@ -548,13 +548,13 @@ class SmokeTest(PBSTestSuite):
         Test to submit job with job script
         """
         j = Job(TEST_USER, attrs={ATTR_N: 'test'})
-        j.create_script('pbs-sleep 120\n', hostname=self.server.client)
+        j.create_script('pbs_sleep 120\n', hostname=self.server.client)
         jid = self.server.submit(j)
         self.server.expect(JOB, {'job_state': 'R'}, id=jid)
         self.server.delete(id=jid, extend='force', wait=True)
         self.logger.info("Testing script with extension")
         j = Job(TEST_USER)
-        fn = self.du.create_temp_file(hostname=self.server.client, suffix=".scr", body="pbs-sleep 15",
+        fn = self.du.create_temp_file(hostname=self.server.client, suffix=".scr", body="pbs_sleep 15",
                                       asuser=str(TEST_USER))
         jid = self.server.submit(j, script=fn)
         self.server.expect(JOB, {'job_state': 'R'}, id=jid)
