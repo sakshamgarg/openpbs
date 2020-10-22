@@ -577,28 +577,17 @@ class WinMoM(MoM):
         :type procname: str or None
         """
 
-        #pid = self._get_pid(inst=inst)
-# 
-        # cmd = ['taskkill', '/F', '/PID']
-        # if procname is not None:
-            # pi = self.get_proc_info(self.hostname, procname)
-            # if pi is not None and pi.values() and list(pi.values())[0]:
-                # for _p in list(pi.values())[0]:
-                    # cmd += [_p.pid]
-                    # if sig is '-HUP':
-                        # cmd += ['&&', 'net start pbs_mom']
-                    # ret = self.du.run_cmd(self.hostname, cmd)
-                # return ret
-# 
-        # if pid is None:
-            # return {'rc': 0, 'err': '', 'out': 'no pid to signal'}
-# 
-        # cmd += [pid]
         cmd = ['net stop pbs_mom']
         if sig == '-HUP':
             cmd += ['&&', 'net start pbs_mom']
 
         ret = self.du.run_cmd(self.hostname, cmd)
+
+        # In case mom is already stopped
+        if ret['rc'] != 0:
+            if ret['err'][0] == 'The PBS_MOM service is not started.':
+                cmd = ['net start pbs_mom']
+                ret = self.du.run_cmd(self.hostname, cmd)
 
         return ret
 
