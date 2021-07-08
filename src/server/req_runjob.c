@@ -804,8 +804,7 @@ req_runjob2(struct batch_request *preq, job *pjob)
 void
 clear_exec_on_run_fail(job *jobp)
 {
-	if ((jobp->ji_qs.ji_svrflags &
-		(JOB_SVFLG_CHKPT | JOB_SVFLG_StagedIn)) == 0) {
+	if ((jobp->ji_qs.ji_svrflags & JOB_SVFLG_CHKPT ) == 0) {
 
 		free_jattr(jobp, JOB_ATR_exec_host);
 		free_jattr(jobp, JOB_ATR_exec_host2);
@@ -1615,11 +1614,12 @@ post_sendmom(struct work_task *pwt)
 			/*
 			 * If there is a checkpoint, we leave exec_vnode
 			 *    to force that it will run there again;
-			 * Or if stagein was already successful, we leave
-			 *    exec_vnode set as the files are there and
-			 *    we dont want to copy them again;
 			 * ELSE clear exec_vnode, exec_host, etc.
 			 */
+
+			/* turn off the staged in flag */
+			jobp->ji_qs.ji_svrflags &= ~JOB_SVFLG_StagedIn;
+
 			snprintf(dest_host, sizeof(dest_host), "%s", jobp->ji_qs.ji_destin);
 			clear_exec_on_run_fail(jobp);
 

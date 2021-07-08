@@ -48,6 +48,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <assert.h>
+#include <pwd.h>
 
 #include <signal.h>
 #include <memory.h>
@@ -766,6 +767,7 @@ void
 del_job_dirs(job *pjob, char *taskdir)
 {
 	char namebuf[MAXPATHLEN + 1] = {'\0'};
+	struct passwd *pwdp = NULL;
 
 	if (taskdir == NULL) {
 		strcpy(namebuf, path_jobs);      /* job directory path */
@@ -796,6 +798,12 @@ del_job_dirs(job *pjob, char *taskdir)
 					jobdirname(pjob->ji_qs.ji_jobid, pjob->ji_grpcache->gc_homedir),
 					pjob->ji_grpcache->gc_uid,
 					pjob->ji_grpcache->gc_gid,
+					check_shared);
+			else if ((pwdp = getpwnam(get_jattr_str(pjob, JOB_ATR_euser))) != NULL)
+				rmjobdir(pjob->ji_qs.ji_jobid,
+					jobdirname(pjob->ji_qs.ji_jobid, pwdp->pw_dir),
+					pwdp->pw_uid,
+					pwdp->pw_gid,
 					check_shared);
 			else
 				rmjobdir(pjob->ji_qs.ji_jobid,
