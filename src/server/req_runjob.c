@@ -790,8 +790,8 @@ req_runjob2(struct batch_request *preq, job *pjob)
  *		clear exec strings so job can be resecheduled anywhere.
  *
  * @par Functionality:
- *		If the job has been checkpointed or has files staged in, then
- *		the job must run where it ran before or where the files where staged.
+ *		If the job has been checkpointed then
+ *		the job must run where it ran before.
  *		Otherwise it is free to run anywhere when re-scheduled.  In this case,
  *		clear the exec_hosts, exec_vnodes, etc.
  *
